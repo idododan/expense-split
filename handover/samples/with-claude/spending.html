@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Spending — split with Guy</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap');
+  :root {
+    --ido: #FF6B9D;
+    --ido-light: #FFE0EE;
+    --guy: #6B9DFF;
+    --guy-light: #E0EEFF;
+    --bg: #FFF9F0;
+    --text: #2D2640;
+    --gray: #9E9BAD;
+    --card: #FFFFFF;
+    --shadow: 0 8px 32px rgba(45,38,64,0.10);
+    --radius: 24px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Heebo', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+
+  .header { background: linear-gradient(135deg, #FF6B9D 0%, #6B9DFF 100%); padding: 28px 20px 22px; text-align: center; position: relative; overflow: hidden; }
+  .header::before { content: ''; position: absolute; top: -40px; right: -40px; width: 160px; height: 160px; border-radius: 50%; background: rgba(255,255,255,0.12); }
+  .header::after  { content: ''; position: absolute; bottom: -60px; left: -30px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+  .header .eyebrow { font-size: 13px; color: #fff; letter-spacing: 2px; font-weight: 700; text-transform: uppercase; position: relative; z-index: 1; margin-bottom: 6px; }
+  .header h1 { font-weight: 900; font-size: 26px; color: #fff; position: relative; z-index: 1; text-shadow: 0 2px 8px rgba(0,0,0,0.15); line-height: 1.2; }
+  .header .subtitle { color: rgba(255,255,255,0.92); font-size: 14px; margin-top: 6px; position: relative; z-index: 1; }
+  .update-btn { position: relative; z-index: 1; margin-top: 14px; background: rgba(255,255,255,0.22); color: #fff; border: none; border-radius: 20px; padding: 9px 18px; font-family: 'Heebo', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+  .update-btn:hover { background: rgba(255,255,255,0.32); }
+  .update-btn:active { transform: scale(0.96); }
+  .update-btn:disabled { opacity: 0.6; cursor: default; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: #2D2640; color: #fff; padding: 12px 22px; border-radius: 20px; font-size: 14px; z-index: 200; transition: transform 0.4s cubic-bezier(.34,1.56,.64,1); white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .content { padding: 16px; max-width: 560px; margin: 0 auto; }
+
+  /* Summary card */
+  .summary { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px 20px; margin-bottom: 18px; }
+  .total-row { text-align: center; }
+  .total-label { font-size: 13px; color: var(--gray); }
+  .total-amount { font-weight: 900; font-size: 40px; line-height: 1.1; margin-top: 2px; }
+  .divider { height: 1px; background: #F0EEF5; margin: 18px 0; }
+  .balance-row { text-align: center; }
+  .balance-label { font-size: 13px; color: var(--gray); }
+  .balance-amount { font-weight: 900; font-size: 30px; line-height: 1.1; margin-top: 2px; }
+  .settle-note { margin-top: 14px; background: #E8F5E9; color: #2e7d32; border-radius: 14px; padding: 10px 14px; font-size: 13px; font-weight: 700; text-align: center; line-height: 1.4; }
+
+  /* Receipts */
+  .section-title { font-size: 13px; font-weight: 700; color: var(--gray); text-transform: uppercase; letter-spacing: 1px; margin: 6px 4px 10px; }
+  .receipt { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
+  .receipt .icon { font-size: 22px; }
+  .receipt .info { flex: 1; min-width: 0; }
+  .receipt .desc { font-weight: 700; font-size: 15px; }
+  .receipt .meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
+  .receipt .money { text-align: right; white-space: nowrap; }
+  .receipt .amount { font-weight: 900; font-size: 17px; }
+  .receipt .amount .conv { font-weight: 400; font-size: 12px; color: var(--gray); }
+  .receipt .half { font-size: 11px; color: var(--gray); margin-top: 2px; }
+
+  .footer { text-align: center; padding: 16px; font-size: 11px; color: #D0CDD8; }
+  .footer a { color: #B7B4C4; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <p class="eyebrow">Claude spending 💸</p>
+  <h1>Claude Spending</h1>
+  <p class="subtitle">Receipts split 50/50 — Ido &amp; Guy · since Jun 7, 2026</p>
+  <button class="update-btn" id="update-btn" onclick="checkEmail()">🔄 Check email for new receipts</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="content">
+  <div class="summary">
+    <div class="total-row">
+      <div class="total-label">Total spent</div>
+      <div class="total-amount" id="total">$0.00</div>
+    </div>
+    <div class="divider"></div>
+    <div class="balance-row">
+      <div class="balance-label" id="balance-label">Guy owes Ido</div>
+      <div class="balance-amount" id="balance-amount">$0.00</div>
+    </div>
+    <div class="settle-note" id="settle-note" style="display:none"></div>
+  </div>
+
+  <div class="section-title" id="receipts-title">Receipts</div>
+  <div id="receipts"></div>
+</div>
+
+<div class="footer">
+  <span id="receipt-count"></span> · <a href="index.html">phone tracker →</a>
+</div>
+
+<script>
+  // Paste the deployed Google Apps Script web-app URL here (see apps-script/Code.gs).
+  // While empty, the "Check email" button explains how to set it up.
+  var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzo2LyWKmfhiJak5fM6Imx3Vxasy9_xmeGBPojmPnnyyMQ-gvzeED46oOWoX2L3BRDs2Q/exec";
+
+  // Accounting between Ido and Guy starts on this date — earlier charges are
+  // kept for record but excluded from the totals and the split.
+  var ACCOUNTING_START = "2026-06-07";
+
+  // Real Anthropic receipts pulled from idodan@gmail.com (Mar–Jun 2026).
+  // Each Claude charge is split 50/50 between Ido and Guy.
+  var ALL_RECEIPTS = [
+    { date: "2026-07-14", amount: 10.29, desc: "Auto-recharge credits",                  receipt: "2872-6708-2120", paidBy: "Ido" },
+    { date: "2026-07-13", amount: 100.00, desc: "Max plan – 5x (Jul 13–Aug 13)",          receipt: "2255-1861-9763", paidBy: "Ido" },
+    { date: "2026-07-13", amount: 10.11, desc: "Auto-recharge credits",                  receipt: "2529-0900-1189", paidBy: "Ido" },
+    { date: "2026-07-12", amount: 15.76, desc: "Auto recharge extra usage, Individual",   receipt: "2625-6512-4080", paidBy: "Ido" },
+    { date: "2026-07-09", amount: 17.51, desc: "Auto recharge extra usage, Individual",   receipt: "2848-5968-3195", paidBy: "Ido" },
+    { date: "2026-07-04", amount: 11.58, desc: "Auto recharge extra usage, Individual",   receipt: "2173-3028-9439", paidBy: "Ido" },
+    { date: "2026-06-28", amount: 10.11, desc: "Auto-recharge credits",                  receipt: "2854-4435-0055", paidBy: "Ido" },
+    { date: "2026-06-23", amount: 10.06, desc: "Auto-recharge credits",                  receipt: "2778-6990-3362", paidBy: "Ido" },
+    { date: "2026-06-20", amount: 10.73, desc: "Auto-recharge credits",                  receipt: "2574-6697-3096", paidBy: "Ido" },
+    { date: "2026-06-18", amount: 10.89, desc: "Auto-recharge credits",                  receipt: "2649-5554-0746", paidBy: "Ido" },
+    { date: "2026-06-18", amount: 10.54, desc: "Auto-recharge credits",                  receipt: "2990-2991-9589", paidBy: "Ido" },
+    { date: "2026-06-18", amount: 11.36, desc: "Auto-recharge credits",                  receipt: "2421-9425-6023", paidBy: "Ido" },
+    { date: "2026-06-17", amount: 15.23, desc: "Auto-recharge credits",                  receipt: "2837-4682-1304", paidBy: "Ido" },
+    { date: "2026-06-17", amount: 20.00, desc: "One-time credit purchase",                receipt: "2485-3157-9637", paidBy: "Ido" },
+    { date: "2026-06-13", amount: 90.54, desc: "Max plan – 5x (Jun 13–Jul 13)",           receipt: "2595-5003-9268", paidBy: "Ido" },
+    { date: "2026-06-07", amount:  5.00, desc: "One-time credit purchase",                receipt: "2055-4744-5590", paidBy: "Ido" },
+    { date: "2026-05-28", amount: 20.00, desc: "Claude Pro (May 28–Jun 28)",              receipt: "2727-7664-9379", paidBy: "Ido" },
+    { date: "2026-04-28", amount: 89.78, desc: "Max plan – 5x (Apr 28–May 28)",           receipt: "2564-6442-9722", paidBy: "Ido" },
+    { date: "2026-04-28", amount: 45.00, desc: "Prepaid extra usage, Individual plan",    receipt: "2756-8870-6252", paidBy: "Ido" },
+    { date: "2026-04-13", amount: 20.00, desc: "Claude Pro (Apr 13–May 13)",              receipt: "2528-0892-2975", paidBy: "Ido" },
+    { date: "2026-03-18", amount: 11.21, desc: "Auto recharge extra usage, Individual",   receipt: "2745-0946-9844", paidBy: "Ido" },
+    { date: "2026-03-18", amount:  5.00, desc: "Prepaid extra usage, Individual plan",    receipt: "2834-0651-6648", paidBy: "Ido" },
+    { date: "2026-03-18", amount:  5.00, desc: "Prepaid extra usage, Individual plan",    receipt: "2006-9180-0924", paidBy: "Ido" },
+    { date: "2026-03-18", amount:  5.00, desc: "Prepaid extra usage, Individual plan",    receipt: "2338-3261-4685", paidBy: "Ido" },
+    { date: "2026-03-13", amount: 20.00, desc: "Claude Pro (Mar 13–Apr 13)",              receipt: "2268-6793-0467", paidBy: "Ido" }
+  ];
+
+  // Only receipts on or after the accounting start date count.
+  var RECEIPTS = ALL_RECEIPTS.filter(function(r) { return r.date >= ACCOUNTING_START; });
+
+  // Payments Guy has made toward his 50% share. Each one resets the balance:
+  // current balance = (total spent / 2) − everything Guy has already paid, so
+  // new receipts start a fresh balance from the last settlement.
+  // Payments made in shekels use `ils`; they are converted to USD at the live
+  // rate fetched below. Payments already in dollars use `amount`.
+  var SETTLEMENTS = [
+    { date: "2026-06-18", by: "Guy", amount: 65.39, note: "his half of the first $130.77" },
+    { date: "2026-07-14", by: "Guy", ils: 347,      note: "his half of Jun–Jul spending" },
+    { date: "2026-08-13", by: "Guy", ils: 465,      note: "his half of spending through mid-Aug" }
+  ];
+
+  // USD/ILS exchange rate. Fetched live at load from a free, no-key, CORS API;
+  // FALLBACK_RATE (last known) is used if the network request fails.
+  var FALLBACK_RATE = 3.0129;
+  var fx = { ilsPerUsd: FALLBACK_RATE, date: null, live: false };
+
+  function fetchRate() {
+    // Primary: Frankfurter (ECB data). Fallback: open.er-api.com.
+    fetch("https://api.frankfurter.app/latest?from=USD&to=ILS")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.rates || !d.rates.ILS) throw new Error("no rate");
+        fx = { ilsPerUsd: d.rates.ILS, date: d.date, live: true };
+        render();
+      })
+      .catch(function () {
+        return fetch("https://open.er-api.com/v6/latest/USD")
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d || !d.rates || !d.rates.ILS) throw new Error("no rate");
+            fx = { ilsPerUsd: d.rates.ILS,
+                   date: (d.time_last_update_utc || "").slice(0, 16), live: true };
+            render();
+          })
+          .catch(function () { /* keep fallback rate */ });
+      });
+  }
+
+  // Convert a settlement to USD (shekel payments use the live rate).
+  function settlementUsd(s) {
+    if (typeof s.ils === "number") return s.ils / fx.ilsPerUsd;
+    return s.amount || 0;
+  }
+
+  function fmt(n) { return "$" + n.toFixed(2); }
+  function fmtIls(n) { return "₪" + n.toFixed(2); }
+
+  // Each receipt has a currency (`cur`: "USD" or "ILS"); older ones default to USD.
+  function recCur(r) { return r.cur || "USD"; }
+  function toIls(r)  { return recCur(r) === "ILS" ? r.amount : r.amount * fx.ilsPerUsd; }
+  function money(amount, cur) { return (cur === "ILS" ? "₪" : "$") + amount.toFixed(2); }
+
+  function fmtDate(iso) {
+    var d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function render() {
+    var total = 0;  // in ₪
+    RECEIPTS.forEach(function(r) { total += toIls(r); });
+    document.getElementById("total").textContent = fmtIls(total);
+
+    // Balance counts ONLY spending after Guy's most recent payment — each
+    // payment resets the ledger, so the balance is just half of the receipts
+    // dated after that payment (converted to ₪).
+    var lastPayDate = null;
+    SETTLEMENTS.forEach(function(s) {
+      if (s.by === "Guy" && (!lastPayDate || s.date > lastPayDate)) lastPayDate = s.date;
+    });
+    var newSpend = 0;  // in ₪
+    RECEIPTS.forEach(function(r) {
+      if (!lastPayDate || r.date > lastPayDate) newSpend += toIls(r);
+    });
+    var guyOwes = newSpend / 2;
+
+    var label = document.getElementById("balance-label");
+    var amt   = document.getElementById("balance-amount");
+    if (guyOwes < 0.01) {
+      label.textContent = "All settled up 🎉";
+      amt.textContent   = fmtIls(0);
+    } else {
+      label.textContent = lastPayDate
+        ? "Guy owes Ido · since " + fmtDate(lastPayDate)
+        : "Guy owes Ido";
+      amt.textContent   = fmtIls(guyOwes);
+    }
+
+    var note = document.getElementById("settle-note");
+    var guySettlements = SETTLEMENTS.filter(function(s) { return s.by === "Guy"; });
+    if (guySettlements.length) {
+      var last = guySettlements[guySettlements.length - 1];
+      var paidStr, rateStr = "";
+      if (typeof last.ils === "number") {
+        paidStr = "₪" + last.ils + " (~" + fmt(settlementUsd(last)) + ")";
+        rateStr = " · 1 USD = ₪" + fx.ilsPerUsd.toFixed(4) +
+          (fx.live ? (fx.date ? " (" + fx.date + ")" : " (live)") : " (offline rate)");
+      } else {
+        paidStr = fmt(last.amount);
+      }
+      note.style.display = "block";
+      note.textContent = "✅ Guy paid " + paidStr + " on " + fmtDate(last.date) +
+        " — new balance counts from here." + rateStr;
+    } else {
+      note.style.display = "none";
+    }
+
+    document.getElementById("receipt-count").textContent =
+      RECEIPTS.length + " receipts · " + fmtIls(total) + " total";
+    document.getElementById("receipts-title").textContent =
+      "Receipts (" + RECEIPTS.length + ")";
+
+    var container = document.getElementById("receipts");
+    container.innerHTML = RECEIPTS.map(function(r) {
+      var cur = recCur(r);
+      var ilsVal = toIls(r);
+      var primary = money(r.amount, cur);
+      var other = cur === "ILS" ? money(r.amount / fx.ilsPerUsd, "USD")
+                                : money(ilsVal, "ILS");
+      return '<div class="receipt">' +
+        '<div class="icon">🧾</div>' +
+        '<div class="info">' +
+          '<div class="desc">' + r.desc + '</div>' +
+          '<div class="meta">' + fmtDate(r.date) + ' · #' + r.receipt + '</div>' +
+        '</div>' +
+        '<div class="money">' +
+          '<div class="amount">' + primary + ' <span class="conv">(' + other + ')</span></div>' +
+          '<div class="half">₪' + (ilsVal / 2).toFixed(2) + ' each</div>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+  }
+
+  render();       // paint immediately with the fallback rate
+  fetchRate();    // then refresh once the live USD/ILS rate arrives
+
+  // ── Toast ──
+  var toastTimer;
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3800);
+  }
+
+  // ── Check email for new receipts (JSONP to the Apps Script web app) ──
+  var checking = false;
+  function checkEmail() {
+    if (checking) return;
+    var btn = document.getElementById("update-btn");
+
+    if (!APPS_SCRIPT_URL) {
+      showToast("Set APPS_SCRIPT_URL first — see apps-script/Code.gs for setup.");
+      return;
+    }
+
+    checking = true;
+    btn.disabled = true;
+    btn.textContent = "🔄 Checking…";
+
+    var cb = "onReceipts_" + Date.now();
+    var prevCount = RECEIPTS.length;
+    var done = false;
+
+    function finish(ok, msg) {
+      if (done) return;
+      done = true;
+      checking = false;
+      btn.disabled = false;
+      btn.textContent = "🔄 Check email for new receipts";
+      if (msg) showToast(msg);
+      try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cb] = function (data) {
+      if (!Array.isArray(data)) { finish(false, "Unexpected response from email check."); return; }
+      RECEIPTS = data.filter(function (r) { return r.date >= ACCOUNTING_START; });
+      render();
+      var added = RECEIPTS.length - prevCount;
+      finish(true, added > 0
+        ? "Added " + added + " new receipt" + (added === 1 ? "" : "s") + " ✅"
+        : "Up to date — no new receipts.");
+    };
+
+    var script = document.createElement("script");
+    script.src = APPS_SCRIPT_URL + (APPS_SCRIPT_URL.indexOf("?") === -1 ? "?" : "&") + "callback=" + cb;
+    script.onerror = function () { finish(false, "Couldn't reach the email checker."); };
+    document.body.appendChild(script);
+
+    setTimeout(function () { finish(false, "Email check timed out — try again."); }, 45000);
+  }
+</script>
+</body>
+</html>
