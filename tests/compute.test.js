@@ -54,9 +54,11 @@ test("history: feed rows win, pre-start rows stay visible and unsplit", function
 
 test("vendors '*': every receipt counts; null amounts are shown, not summed", function () {
   var m = core.compute(feed, acc, { ilsPerUsd: 3.0 });
-  assert.equal(m.nCounted, 38);
-  assert.equal(m.rows.filter(function (r) { return r.unparsed; }).length, 4);
-  assert.equal(r2(m.byMerchant["019 SMS"]), r2(29.5 / 3.0)); // receipt_total set: already MGS's part
+  assert.equal(m.nCounted, 37);
+  // 4 rows without an amount + the 019 SMS row (₪29.50, needs_parsing): shown, not summed
+  assert.equal(m.rows.filter(function (r) { return r.unparsed; }).length, 5);
+  assert.equal(m.byMerchant["019 SMS"], undefined);
+  assert.equal(r2(m.total), r2(1020.51 + 12 + 5.68));
 });
 
 test("a history row without a feed row counts; exclusions and adjustments apply", function () {

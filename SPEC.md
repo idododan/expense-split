@@ -45,7 +45,7 @@ for minutes). Until a data repo has its `accounting.json`, a project can use the
 ```
 
 - `id` is stable per receipt file; `reference` identifies the vendor document.
-- `amount` may be `null` (`status: "needs_parsing"`): shown, not summed.
+- `status: "needs_parsing"` rows (amount `null` or tentative): shown, not summed (O2).
 - `receipt_total` set ⇒ `amount` is already this project's part: never divide again.
 - `shared: true, receipt_total: null` ⇒ the full amount is in both projects' files
   (Anthropic today). Per the owner's decision every row is split within its project at
@@ -81,7 +81,7 @@ for minutes). Until a data repo has its `accounting.json`, a project can use the
 counted rows  = feed rows ∪ history rows, deduplicated by reference (feed row wins;
                 a history row without a feed row still counts),
                 date ≥ accounting_start, merchant in vendors, id/reference not excluded,
-                amount is a number
+                amount is a number, status is not needs_parsing
 total         = Σ counted rows, each converted to display_currency
 share(p)      = total × shares[p]
 balance(p)    = share(p) − Σ settlements by p + Σ adjustments for p   (p ≠ paid_by)
@@ -160,13 +160,12 @@ payment in memory (nothing is saved).
 
 ## 10. Open points for the owner
 
-- **O1 — shared Claude receipts.** Anthropic rows are `shared` with
-  `receipt_total: null`: the full $100 is in both the MGS and the YourRights feed, so
-  as specified each project splits the full amount (Guy pays $50 and Omri pays $50 of
-  the same $100). Confirm, or decide a rule (e.g. halve shared rows with no
-  `receipt_total`).
-- **O2 — rows with `needs_parsing` but an amount** (MGS: 019 SMS ₪29.50 of ₪59,
-  2026-09-30). Counted today because the amount is there; say if they should wait.
+- **O1 — shared Claude receipts: decided (owner, 2026-11-08).** Each project splits the
+  full amount of a `shared` row with `receipt_total: null` (Guy pays $50 and Omri pays
+  $50 of the same $100).
+- **O2 — `needs_parsing` rows: decided (owner, 2026-11-08).** Never summed, even when
+  they carry a tentative amount (MGS: 019 SMS ₪29.50 of ₪59, 2026-09-30); shown greyed
+  as "not read yet · not counted" until the collector parses them.
 - **O3 — the mockup headline.** $347.31 is the Anthropic-only figure; with every
   vendor split the MGS headline is higher (Render, Green API, 019 SMS since Aug 13).
 - **O4 — FX carry-over.** The old page converted Guy's ₪ payments at today's rate and

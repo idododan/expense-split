@@ -131,8 +131,11 @@
       else if (excluded[r.id] || (r.reference && excluded[r.reference])) r.skip = "excluded";
       else if (vendors && vendors.indexOf(r.merchant) === -1) r.skip = "vendor not split";
       r.after = !lastDate || r.date > lastDate;
-      r.counted = !r.skip && r.value !== null;
-      r.unparsed = !r.skip && r.value === null;
+      // A row the collector has not finished reading is shown but never summed,
+      // even when it already carries a tentative amount (owner, 2026-11-08).
+      r.pending = r.status === "needs_parsing";
+      r.counted = !r.skip && !r.pending && r.value !== null;
+      r.unparsed = !r.skip && !r.counted;
       if (r.counted) {
         total += r.value; nCounted++;
         byMerchant[r.merchant] = (byMerchant[r.merchant] || 0) + r.value;
@@ -361,6 +364,9 @@
       if (r.value === null && !isNum(r.amount)) {
         amountHtml = '<span class="na">—</span>';
         sub = "amount not read yet";
+      } else if (r.pending && !r.skip) {
+        amountHtml = '<span class="na">' + money(r.amount, r.currency) + "</span>";
+        sub = "not read yet · not counted";
       } else if (r.value === null) {
         amountHtml = money(r.amount, r.currency);
         sub = "unknown currency";

@@ -20,11 +20,12 @@ Checked (`node tools/report.js mgs 3.0129 --only=Anthropic`, tests, headless Chr
 | Guy's half of that | $173.66 | $173.66 |
 | History rows also in the feed | 16, same ref & amount | 16 deduplicated (feed wins); 9 pre-June rows shown under "Not split" |
 
-With every vendor split (`vendors: "*"`, the real MGS page, rate ₪3.0129):
-headline $374.78 over 10 rows (+ Render $5.68, Green API $12.00, 019 SMS ₪29.50 ≈ $9.79);
-total since Jun 7 $1,047.98 over 38 rows; Guy owes $189.09 (Claude-only view: $175.36),
-of which $1.70 is FX carry-over (SPEC O4). 4 MGS rows have no amount yet (shown, not summed).
-YourRights: $428.88 over 12 rows, Omri owes $214.44.
+With every vendor split (`vendors: "*"`, the real MGS page, rate ₪3.0129) and
+`needs_parsing` rows left out (O2): headline $364.99 over 9 rows (+ Render $5.68,
+Green API $12.00); total since Jun 7 $1,038.19 over 37 rows (footer); Guy owes $184.20
+(Claude-only view: $175.36), of which $1.70 is FX carry-over (SPEC O4). 5 MGS rows are
+shown but not summed (4 without an amount, 019 SMS ₪29.50 awaiting parsing).
+YourRights: $419.09 over 11 rows, Omri owes $209.54.
 
 Not verifiable here: the live rate (this sandbox can't reach Frankfurter/api.github.com;
 the page fell back to ₪3.0129), the `github` source, and the Apps Script.
@@ -32,4 +33,4 @@ the page fell back to ₪3.0129), the `github` source, and the Apps Script.
 ## Next — Phase C (on the owner's go)
 Owner: fine-grained token + PINs in Script Properties, deploy the Apps Script, put its
 URL in `projects.json`. Then commit the two `accounting.json` files to the data repos,
-switch both projects to `source: "github"`, enable Pages. Open points: SPEC §10 O1–O4.
+switch both projects to `source: "github"`, enable Pages. Open points: SPEC §10 O3, O4. O1 and O2 decided 2026-11-08.
