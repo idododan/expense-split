@@ -66,6 +66,9 @@ function addPayment(p) {
   if (!(pay.amount > 0) || pay.amount > 1000000) throw new Error('bad amount');
   if (CURRENCIES.indexOf(pay.currency) === -1) throw new Error('currency must be USD or ILS');
   if (!pay.note) delete pay.note;
+  // Fix the payment's value at its own date's rate, so it never drifts later.
+  var rate = pay.currency === 'ILS' ? rateOn(pay.date) : null;
+  if (rate) pay.ils_per_usd = rate;
 
   var branch = props.getProperty('BRANCH_' + project) || 'main';
   var token = props.getProperty('GITHUB_TOKEN');
@@ -87,7 +90,8 @@ function addPayment(p) {
     var sym = pay.currency === 'ILS' ? '₪' : '$';
     var message = 'payment: ' + pay.by + ' ' + sym + formatAmount(pay.amount) + ' on ' + pay.date;
     var sha = writeFile(repo, branch, token, JSON.stringify(acc, null, 2) + '\n', file.sha, message);
-    return { ok: true, commit: sha, message: message };
+    return { ok: true, commit: sha, message: message, ils_per_usd: rate,
+             warning: pay.currency === 'ILS' && !rate ? 'no rate for that date; today\'s rate will be used' : undefined };
   } finally {
     lock.releaseLock();
   }
@@ -101,6 +105,20 @@ function checkPin(project, expected, given) {
   if (given !== expected) {
     cache.put(key, String(bad + 1), 3600);
     throw new Error('wrong PIN');
+  }
+}
+
+// ECB USD/ILS rate for a date (Frankfurter answers with the last working day on or
+// before it). null when unavailable.
+function rateOn(date) {
+  try {
+    var res = UrlFetchApp.fetch('https://api.frankfurter.app/' + date + '?from=USD&to=ILS',
+                                { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return null;
+    var r = JSON.parse(res.getContentText()).rates;
+    return r && typeof r.ILS === 'number' ? r.ILS : null;
+  } catch (e) {
+    return null;
   }
 }
 

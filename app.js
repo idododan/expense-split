@@ -112,10 +112,14 @@
     });
 
     // 3. Settlements and the date the "since last payment" window opens.
+    // A payment's value is fixed at its own date's rate (`ils_per_usd`, written by the
+    // Apps Script) so it does not drift with today's rate; without one, today's rate.
     var settlements = (acc.settlements || []).map(function (s) {
+      var locked = isNum(s.ils_per_usd) && s.ils_per_usd > 0;
       return {
         date: s.date, by: s.by, amount: s.amount, currency: s.currency || disp, note: s.note || "",
-        value: convert(s.amount, s.currency || disp, disp, rate)
+        rate: locked ? s.ils_per_usd : rate, locked: locked,
+        value: convert(s.amount, s.currency || disp, disp, locked ? s.ils_per_usd : rate)
       };
     }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var last = settlements.length ? settlements[settlements.length - 1] : null;
@@ -332,8 +336,10 @@
       var rateStr = "";
       if (last.currency !== disp && last.value !== null) {
         paidStr += " (~" + money(last.value, disp) + ")";
-        rateStr = " · 1 USD = ₪" + m.ilsPerUsd.toFixed(4) +
-          (state.fx.live ? (state.fx.date ? " (" + state.fx.date + ")" : " (live)") : " (offline rate)");
+        rateStr = last.locked
+          ? " · at that day's rate, 1 USD = ₪" + last.rate.toFixed(4)
+          : " · 1 USD = ₪" + m.ilsPerUsd.toFixed(4) +
+            (state.fx.live ? (state.fx.date ? " (" + state.fx.date + ")" : " (live)") : " (offline rate)");
       }
       html.push('<div class="settle-note">✅ ' + esc(last.by) + " paid " + esc(paidStr) + " on " + fmtDay(last.date) +
         " — new balance counts from here." + esc(rateStr) + "</div>");
@@ -449,6 +455,7 @@
   function submitPayment(pay, pin) {
     var btn = $("pay-submit");
     if (state.source === "local") {
+      if (pay.currency === "ILS" && state.fx.live) pay.ils_per_usd = state.fx.ilsPerUsd;
       state.acc.settlements = (state.acc.settlements || []).concat([pay]);
       render();
       toast("Local data: payment shown for preview only, nothing was saved.");

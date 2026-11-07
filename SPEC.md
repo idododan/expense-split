@@ -64,7 +64,7 @@ for minutes). Until a data repo has its `accounting.json`, a project can use the
   "vendors": "*",
   "excluded": [],
   "history": [ {"date", "merchant", "reference", "amount", "currency", "desc", "paid_by"} ],
-  "settlements": [ {"date", "by", "amount", "currency", "note"} ],
+  "settlements": [ {"date", "by", "amount", "currency", "note", "ils_per_usd"?} ],
   "adjustments": [ {"date", "partner", "amount", "currency", "note"} ]
 }
 ```
@@ -73,6 +73,7 @@ for minutes). Until a data repo has its `accounting.json`, a project can use the
 - `excluded`: feed `id`s or `reference`s that must not count (shown under "Not split").
 - `history`: rows from before the feed; never disappear.
 - `settlements`: a partner's payment to `paid_by`; never disappear; appended by the app.
+  `ils_per_usd` (optional): the rate on the payment's date; fixes its value (O4).
 - `adjustments`: `amount` > 0 increases what `partner` owes, < 0 decreases it.
 
 ## 5. Balance rule
@@ -92,7 +93,7 @@ carried(p)    = balance(p) − since-last × shares[p]   (shown when |carried| �
 
 Currency conversion: one USD/ILS rate, live from Frankfurter, fallback open.er-api.com,
 last resort a fixed rate (3.0129, the old page's), exactly as the old page. ILS
-settlements are converted at that same live rate.
+settlements with `ils_per_usd` use that rate; others use the live rate.
 
 ## 6. Page
 
@@ -168,10 +169,11 @@ payment in memory (nothing is saved).
   as "not read yet · not counted" until the collector parses them.
 - **O3 — the mockup headline.** $347.31 is the Anthropic-only figure; with every
   vendor split the MGS headline is higher (Render, Green API, 019 SMS since Aug 13).
-- **O4 — FX carry-over.** The old page converted Guy's ₪ payments at today's rate and
-  showed only half of the spending since the last payment, so its balance never had a
-  remainder. The balance rule here (share − payments) leaves a small remainder that moves
-  with the rate (MGS, Claude only: $1.70 at ₪3.0129; $0 at ₪2.994). Shown as
-  "incl. $x carried over". If unwanted: store the USD value of each ₪ payment at its
-  date's rate (an `amount_usd` field), or an adjustment at cut-over.
+- **O4 — FX carry-over: decided (owner left it to us, 2026-11-08).** A ₪ payment is
+  valued at its own date's rate, stored as `ils_per_usd` on the settlement, so it does
+  not drift with today's rate. The Apps Script fills it from Frankfurter when a payment
+  is entered. The two migrated ₪ payments (2026-07-14, 2026-08-13) get theirs at
+  cut-over: `migrate_with_claude.py --rate DATE=RATE` (this sandbox cannot reach
+  Frankfurter). Until then they use today's rate, as the old page did. A remainder that
+  is still left after that is real and stays as "incl. $x carried over".
 - Token and PINs (brief §9).

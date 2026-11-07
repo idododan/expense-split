@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Turn the frozen MGS page (With-Claude spending.html) into the MGS accounting.json.
 
-Usage: python3 tools/migrate_with_claude.py path/to/spending.html > accounting.json
+Usage: python3 tools/migrate_with_claude.py path/to/spending.html \
+           [--rate 2026-07-14=3.xxxx --rate 2026-08-13=3.xxxx] > accounting.json
+
+--rate DATE=ILS_PER_USD fixes a shekel payment's value at that date's rate
+(Frankfurter: https://api.frankfurter.app/DATE?from=USD&to=ILS). Without it the
+payment is valued at the page's live rate.
 
 Reads ALL_RECEIPTS, ACCOUNTING_START and SETTLEMENTS from the page source. Every
 receipt becomes a history row (pre-start rows included: they stay visible, unsplit).
@@ -30,7 +35,7 @@ def objects(body):
     return out
 
 
-def main(path):
+def main(path, rates):
     src = open(path, encoding="utf-8").read()
     start = re.search(r'var ACCOUNTING_START\s*=\s*"(\d{4}-\d\d-\d\d)"', src)
     if not start:
@@ -65,14 +70,19 @@ def main(path):
             amount, cur = s["amount"], "USD"
         else:
             sys.exit("migrate: settlement without amount: %r" % s)
-        pays.append({
+        pay = {
             "date": s["date"],
             "by": s["by"],
             "amount": round(amount, 2),
             "currency": cur,
             "note": s.get("note", ""),
-        })
+        }
+        if cur == "ILS" and s["date"] in rates:
+            pay["ils_per_usd"] = rates.pop(s["date"])
+        pays.append(pay)
     pays.sort(key=lambda p: p["date"])
+    if rates:
+        sys.exit("migrate: --rate for a date with no shekel payment: %s" % ", ".join(rates))
 
     out = {
         "project": "mgs",
@@ -94,6 +104,15 @@ def main(path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    args, rates = sys.argv[1:], {}
+    while "--rate" in args:
+        i = args.index("--rate")
+        try:
+            d, r = args[i + 1].split("=")
+            rates[d] = float(r)
+        except (IndexError, ValueError):
+            sys.exit(__doc__)
+        del args[i:i + 2]
+    if len(args) != 1:
         sys.exit(__doc__)
-    main(sys.argv[1])
+    main(args[0], rates)

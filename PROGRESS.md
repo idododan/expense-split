@@ -33,4 +33,6 @@ the page fell back to ₪3.0129), the `github` source, and the Apps Script.
 ## Next — Phase C (on the owner's go)
 Owner: fine-grained token + PINs in Script Properties, deploy the Apps Script, put its
 URL in `projects.json`. Then commit the two `accounting.json` files to the data repos,
-switch both projects to `source: "github"`, enable Pages. Open points: SPEC §10 O3, O4. O1 and O2 decided 2026-11-08.
+switch both projects to `source: "github"`, enable Pages. Open points: SPEC §10 O3. O1, O2, O4 decided 2026-11-08.
+At cut-over: re-run the migration with `--rate 2026-07-14=… --rate 2026-08-13=…`
+(Frankfurter rates for those dates) before committing MGS `accounting.json`.

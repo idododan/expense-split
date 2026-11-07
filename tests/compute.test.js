@@ -85,3 +85,13 @@ test("describe() strips vendor boilerplate", function () {
   assert.equal(core.describe("receipt 019 sms", "019 SMS", null, null), "");
   assert.equal(core.describe("Welcome to Supabase", "Supabase", null, null), "Welcome to Supabase");
 });
+
+test("a payment with its own rate does not move with today's rate", function () {
+  var a = JSON.parse(JSON.stringify(acc));
+  a.settlements[2].ils_per_usd = 3.1;                // ₪465 on Aug 13
+  var x = core.compute(feed, a, { ilsPerUsd: 3.0, only: ["Anthropic"] });
+  var y = core.compute(feed, a, { ilsPerUsd: 4.0, only: ["Anthropic"] });
+  assert.equal(r2(x.settlements[2].value), r2(465 / 3.1));
+  assert.equal(r2(y.settlements[2].value), r2(465 / 3.1));
+  assert.equal(r2(x.balances[0].paid - y.balances[0].paid), r2(347 / 3.0 - 347 / 4.0)); // Jul 14 still floats
+});
