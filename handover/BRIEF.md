@@ -154,3 +154,14 @@ rows (Aug 15, Sep 7, Sep 9, Oct 7, Oct 24 ×2, Nov 7). Use these to check your n
   feed. Payments: owner only.
 - Still open: the fine-grained GitHub token for the Apps Script (the owner creates it;
   it expires after at most a year), and the per-project PINs (owner picks them).
+
+## 10. Status at handover (2026-11-08)
+
+- All three repos exist and are public. The collector has published the first
+  snapshots: `idododan/mgs-expenses` → `data/expenses.json` (42 rows, since 2026-06-07),
+  `idododan/yourrights-expenses` → `data/expenses.json` (15 rows, since 2026-09-01).
+  Every harvest republishes them (a commit only when the rows changed). You can develop
+  straight against the live files; `samples/` are the same data as of today.
+- Neither data repo has a `data/accounting.json` yet: §6 (migration) produces the MGS
+  one; YourRights gets an empty-history one (start 2026-09-01, Ido & Omri 0.5/0.5).
+- The collector session is done until cut-over (§7 steps 2–3); report back to the owner.
