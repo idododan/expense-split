@@ -15,7 +15,7 @@
       "name": "YourRights",
       "repo": "idododan/yourrights-expenses",
       "branch": "main",
-      "source": "local",
+      "source": "github",
       "local": {
         "expenses": "handover/samples/expenses-yourrights.json",
         "accounting": "data-local/yourrights/accounting.json"

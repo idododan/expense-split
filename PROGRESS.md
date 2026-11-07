@@ -30,7 +30,17 @@ YourRights: $419.09 over 11 rows, Omri owes $209.54.
 Not verifiable here: the live rate (this sandbox can't reach Frankfurter/api.github.com;
 the page fell back to ₪3.0129), the `github` source, and the Apps Script.
 
-## Next — Phase C (on the owner's go)
+## Phase C — Live wiring (owner's go 2026-11-08) — in progress
+- ✅ `idododan/yourrights-expenses`: `data/accounting.json` committed (342b283);
+  `projects.json` → yourrights reads from `github`.
+- ⏳ `idododan/mgs-expenses`: `data/accounting.json` not committed yet (this session
+  could not attach the repo). Needs the two Frankfurter rates first (`--rate`).
+- ⏳ Apps Script: owner's token (expected 2026-11-09) + PINs, deploy, URL in
+  `projects.json`.
+- ⏳ GitHub Pages for `idododan/expense-split` (needs the code on `main`).
+- Not verifiable from this sandbox: api.github.com reads from the page.
+
+## Phase C plan (as agreed)
 Owner: fine-grained token + PINs in Script Properties, deploy the Apps Script, put its
 URL in `projects.json`. Then commit the two `accounting.json` files to the data repos,
 switch both projects to `source: "github"`, enable Pages. Open points: SPEC §10 O3. O1, O2, O4 decided 2026-11-08.
