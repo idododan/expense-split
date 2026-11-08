@@ -3,13 +3,22 @@
 Phases from `handover/BRIEF.md` §8. Newest first. Each entry: what was done, how it was
 checked, what is open.
 
-## ⏸ Waiting for the owner: deploy and push (2026-11-08)
+## ⏸ Live on GitHub Pages; waiting for the owner (2026-11-08)
 
-The app runs locally with the MGS numbers from the brief. The owner decided `SPEC.md` §9
-items 0–2 (per-day rates, USD, shared receipts in full). Left for the owner: deploy the
-Apps Script (steps in the `apps-script/Code.gs` header), put its URL in `projects.json`,
-say when to merge and push `main` to `idododan/expense-split`, enable GitHub Pages, then
-the cut-over of the brief's §7. Nothing has been pushed yet.
+https://idododan.github.io/expense-split/?project=mgs is live from `main` and reads the
+data repos. The Apps Script is deployed and its URL is in `projects.json`; from here it
+answered ping for both projects and refused a wrong PIN on the POST path. Left for the
+owner:
+
+1. The first real payment from the page (end-to-end test of browser → Apps Script →
+   GitHub). A ₪1 `test` row can be removed afterwards by editing `data/accounting.json`
+   in `idododan/mgs-expenses`.
+2. **Card conversion rate.** The owner's actual cost is the card company's shekel
+   charge, not the ECB rate. Proposed: a per-project `card_markup` on top of the daily
+   ECB rate and ₪ as the display currency (SPEC §5/§9 to be updated). Waiting for the
+   markup percentage or one receipt-vs-statement example. Do this before cut-over.
+3. Cut-over (brief §7): compare with the old page, send Guy and Omri the URLs, leave the
+   old page up.
 
 ## Review follow-up — rates per day (2026-11-08)
 
