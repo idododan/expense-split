@@ -23,6 +23,9 @@ original brief and must not be edited except to record owner decisions.
   editing a feed.
 - **Secrets never enter this repo or the page.** The GitHub token and the project PINs
   live only in the Apps Script's Script Properties (`GITHUB_TOKEN`, `PIN_<project>`).
+- **Bump the script version on every change to `app.js`:** the `?v=` in `index.html`'s
+  script tag. GitHub Pages lets browsers cache for 10 minutes; without the bump, partners
+  see a stale page after a deploy.
 - **Don't touch the old page.** `handover/samples/with-claude/` is a frozen copy of the
   page this app replaces; the live copy in `idododan/With-Claude` stays up until the
   owner's cut-over.
