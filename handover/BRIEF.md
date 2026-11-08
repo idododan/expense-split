@@ -152,8 +152,13 @@ rows (Aug 15, Sep 7, Sep 9, Oct 7, Oct 24 ×2, Nov 7). Use these to check your n
 - Repos: data `idododan/mgs-expenses`, `idododan/yourrights-expenses`; app
   `idododan/expense-split`. Shares: 50/50 in both projects, on every receipt in the
   feed. Payments: owner only.
-- Still open: the fine-grained GitHub token for the Apps Script (the owner creates it;
-  it expires after at most a year), and the per-project PINs (owner picks them).
+- Done (owner, 2026-11-08): the fine-grained GitHub token (contents read/write on the
+  two data repos only, expiry ≤ 1 year) and the two project PINs are stored as Script
+  Properties in a new Apps Script project `expense-split payments` under
+  idodan@gmail.com, the same account as the old Claude Spending script. Property names
+  the payments script must read: `GITHUB_TOKEN`, `PIN_mgs`, `PIN_yourrights`. The
+  project has no code yet; the build pastes the payments script into it and deploys it
+  as a web app (Execute as Me, access Anyone), as in `samples/with-claude/Code.gs`.
 
 ## 10. Status at handover (2026-11-08)
 
