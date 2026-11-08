@@ -62,6 +62,16 @@ def main():
     paid_by = acc["paid_by"]
     shares = {p["name"]: p["share"] for p in acc["partners"]}
 
+    def norm(x):  # live files say `by` and may carry the rate of the payment day
+        y = dict(x)
+        y["paid_by"] = x.get("paid_by") or x.get("by")
+        if y.get("rate") is None and isinstance(x.get("ils_per_usd"), (int, float)) \
+                and x.get("currency") == "ILS" and base == "USD":
+            y["rate"] = x["ils_per_usd"]
+        return y
+    settlements = [norm(s) for s in acc.get("settlements", [])]
+    adjustments = [norm(a) for a in acc.get("adjustments", [])]
+
     # rows = feed ∪ history, deduplicated by reference (feed wins)
     feed_refs = {r["reference"] for r in feed["expenses"] if r.get("reference")}
     rows = []
@@ -72,12 +82,17 @@ def main():
             continue
         rows.append(dict(h, id="hist:" + str(h.get("reference")), _src="history"))
 
-    currencies = {r.get("currency") for r in rows} | {s["currency"] for s in acc.get("settlements", [])} \
-        | {a["currency"] for a in acc.get("adjustments", [])}
+    currencies = {r.get("currency") for r in rows} | {s["currency"] for s in settlements} \
+        | {a["currency"] for a in adjustments}
     rates, rate_src = rates_for(base, currencies, args.rate)
 
     def value(amount, cur):
         return amount / rates[cur or base]
+
+    def value_of(x):  # settlement / adjustment: its own recorded rate wins over today's
+        if x.get("rate") and x["currency"] != base:
+            return x["amount"] / x["rate"]
+        return value(x["amount"], x["currency"])
 
     def counted(r):
         return (r["date"] >= start and (vendor_set is None or r["merchant"].lower() in vendor_set)
@@ -87,7 +102,7 @@ def main():
     total = sum(value(r["amount"], r.get("currency")) for r in cnt)
 
     others = [p for p in shares if p != paid_by]
-    last_pay = max((s["date"] for s in acc.get("settlements", []) if s["paid_by"] != paid_by), default=None)
+    last_pay = max((s["date"] for s in settlements if s["paid_by"] != paid_by), default=None)
     since_rows = [r for r in cnt if last_pay is None or r["date"] > last_pay]
     since_last = sum(value(r["amount"], r.get("currency")) for r in since_rows)
 
@@ -96,13 +111,14 @@ def main():
     print("counted rows: %d   total: %s%.2f" % (len(cnt), sym, total))
     print("since last payment (%s): %d rows, %s%.2f" % (last_pay or "start", len(since_rows), sym, since_last))
     for p in others:
-        paid = sum(value(s["amount"], s["currency"]) for s in acc.get("settlements", []) if s["paid_by"] == p)
-        adj = sum(value(a["amount"], a["currency"]) for a in acc.get("adjustments", []) if a["partner"] == p)
+        paid = sum(value_of(s) for s in settlements if s["paid_by"] == p)
+        adj = sum(value_of(a) for a in adjustments if a.get("partner") == p)
         share = total * shares[p]
         bal = share - paid + adj
         carried = bal - since_last * shares[p]
-        print("%s: share %s%.2f − paid %s%.2f %s adj %s%.2f = balance %s%.2f  (carried over %s%.2f)" % (
-            p, sym, share, sym, paid, "+" if adj >= 0 else "−", sym, abs(adj), sym, bal, sym, carried))
+        fixed = sum(1 for s in settlements if s["paid_by"] == p and s.get("rate"))
+        print("%s: share %s%.2f − paid %s%.2f %s adj %s%.2f = balance %s%.2f  (carried over %s%.2f; %d payment(s) at recorded rates)" % (
+            p, sym, share, sym, paid, "+" if adj >= 0 else "−", sym, abs(adj), sym, bal, sym, carried, fixed))
     skipped = [r for r in rows if not counted(r)]
     print("not counted: %d (%d before start, %d no amount, %d excluded, %d other vendor)" % (
         len(skipped), sum(1 for r in skipped if r["date"] < start),

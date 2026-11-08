@@ -6,13 +6,18 @@
 Reads ALL_RECEIPTS, SETTLEMENTS and ACCOUNTING_START out of the page's script with
 regexes (the page is a frozen artefact, so the shapes are fixed). Every ALL_RECEIPTS
 row becomes a history row (pre-start rows included: shown, not split). Each settlement
-keeps its original currency: `ils: 347` → 347 ILS, `amount: 65.39` → 65.39 USD.
+keeps its original currency: `ils: 347` → 347 ILS, `amount: 65.39` → 65.39 USD. With
+--rates, each foreign-currency settlement also gets `rate` = units per display unit on
+its payment date (Frankfurter), so its value does not drift with today's rate.
+
+Field names follow the files the collector published (`desc`, `by`); see SPEC.md §3.
 """
 import argparse
 import datetime as dt
 import json
 import re
 import sys
+import urllib.request
 
 ROW_RE = re.compile(
     r'\{\s*date:\s*"(?P<date>\d{4}-\d{2}-\d{2})",\s*amount:\s*(?P<amount>[\d.]+),'
@@ -38,6 +43,7 @@ def main():
     ap.add_argument("--currency", default="USD", help="display currency")
     ap.add_argument("--partners", nargs="+", default=["Ido:0.5", "Guy:0.5"], metavar="NAME:SHARE")
     ap.add_argument("--paid-by", default="Ido")
+    ap.add_argument("--rates", action="store_true", help="record each settlement's historical rate")
     args = ap.parse_args()
 
     src = open(args.page, encoding="utf-8").read()
@@ -52,7 +58,7 @@ def main():
         history.append({
             "date": r["date"],
             "merchant": "Anthropic",
-            "description": r["desc"].replace("\\u2013", "–"),
+            "desc": r["desc"].replace("\\u2013", "–"),
             "amount": float(r["amount"]),
             "currency": "USD",
             "reference": r["receipt"],
@@ -64,16 +70,21 @@ def main():
     now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     for s in SETTLE_RE.finditer(block(src, "SETTLEMENTS")):
         n = sum(1 for x in settlements if x["date"] == s["date"]) + 1
-        settlements.append({
+        row = {
             "id": "p-%s-%d" % (s["date"], n),
             "date": s["date"],
-            "paid_by": s["by"],
+            "by": s["by"],
             "amount": float(s["value"]),
             "currency": "ILS" if s["kind"] == "ils" else "USD",
             "note": s["note"],
             "added_at": now,
             "added_by": "migration",
-        })
+        }
+        if args.rates and row["currency"] != args.currency:
+            url = "https://api.frankfurter.app/%s?from=%s&to=%s" % (row["date"], args.currency, row["currency"])
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                row["rate"] = json.load(resp)["rates"][row["currency"]]
+        settlements.append(row)
     settlements.sort(key=lambda x: x["date"])
 
     partners = []
@@ -95,6 +106,7 @@ def main():
         "settlements": settlements,
         "adjustments": [],
         "excluded": [],
+        "migrated_from": args.page,
     }
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)

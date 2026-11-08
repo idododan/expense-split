@@ -1,0 +1,21 @@
+{
+  "payments_url": "",
+  "projects": {
+    "mgs": {
+      "name": "MGS-Finance / TRS",
+      "repo": "idododan/mgs-expenses",
+      "branch": "main",
+      "expenses_path": "data/expenses.json",
+      "accounting_path": "data/accounting.json",
+      "local": "local/mgs"
+    },
+    "yourrights": {
+      "name": "YourRights",
+      "repo": "idododan/yourrights-expenses",
+      "branch": "main",
+      "expenses_path": "data/expenses.json",
+      "accounting_path": "data/accounting.json",
+      "local": "local/yourrights"
+    }
+  }
+}

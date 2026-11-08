@@ -50,31 +50,39 @@ caches for minutes; the API answers with CORS `*` and a 60 s cache). Unauthentic
   `subject`, `shared`, `receipt_total`; header `generated_at`.
 - `data/accounting.json` — this app's own file, schema in §3. Written by the owner
   (migration, hand edits) and by the payments script (§6). If missing, the page shows
-  the feed with a clear "no accounting file yet" notice and no balance.
+  the feed with a clear "no accounting file yet" notice and no balance. Both data repos
+  already hold one (published by the collector session on 2026-11-07/08; the MGS one is
+  the migrated old page with Guy's three payments). `local/<project>/accounting.json`
+  is a copy of each.
 
 ## 3. `accounting.json`
 
+The shape is the one the collector published (field names `desc`, `by`); the app also
+accepts `description` and `paid_by`.
+
 ```json
 {
-  "schema": 1,
   "project": "mgs",
-  "accounting_start": "2026-06-07",
   "display_currency": "USD",
+  "accounting_start": "2026-06-07",
   "paid_by": "Ido",
   "partners": [ { "name": "Ido", "share": 0.5 }, { "name": "Guy", "share": 0.5 } ],
   "vendors": "*",
+  "excluded": [ "<feed row id>" ],
   "history": [
-    { "date": "2026-07-13", "merchant": "Anthropic", "description": "Max plan – 5x (Jul 13–Aug 13)",
-      "amount": 100.0, "currency": "USD", "reference": "2255-1861-9763", "paid_by": "Ido" }
+    { "date": "2026-07-13", "merchant": "Anthropic", "reference": "2255-1861-9763",
+      "amount": 100.0, "currency": "USD", "desc": "Max plan – 5x (Jul 13–Aug 13)", "paid_by": "Ido" }
   ],
   "settlements": [
-    { "id": "p-2026-08-13-1", "date": "2026-08-13", "paid_by": "Guy", "amount": 465, "currency": "ILS",
-      "note": "his half of spending through mid-Aug", "added_at": "2026-11-08T10:00:00Z", "added_by": "migration" }
+    { "date": "2026-08-13", "by": "Guy", "amount": 465.0, "currency": "ILS",
+      "note": "his half of spending through mid-Aug", "ils_per_usd": 2.981 },
+    { "id": "p-2026-11-20-1", "date": "2026-11-20", "by": "Guy", "amount": 600, "currency": "ILS",
+      "note": "", "rate": 3.19, "added_at": "2026-11-20T18:02:11Z", "added_by": "web" }
   ],
   "adjustments": [
     { "date": "2026-09-01", "partner": "Guy", "amount": -12.5, "currency": "USD", "note": "…" }
   ],
-  "excluded": [ "<feed row id>" ]
+  "migrated_from": "idododan/With-Claude spending.html"
 }
 ```
 
@@ -86,8 +94,8 @@ caches for minutes; the API answers with CORS `*` and a 60 s cache). Unauthentic
 | `partners` | ordered; shares sum to 1. First listed is shown first. |
 | `vendors` | `"*"` = every feed row counts; otherwise a list of merchant names (case-insensitive) that count. |
 | `history` | receipts from before the feed existed. `reference` is the vendor's document number and is how a history row is matched to a feed row. |
-| `settlements` | partner payments. `amount` is positive, in `currency`. Appended by the payments script; edited or removed only by hand. |
-| `adjustments` | signed amounts added to a partner's balance (positive = owes more). |
+| `settlements` | partner payments. `amount` is positive, in `currency`. `rate` (units of `currency` per 1 display unit on the payment date) fixes the payment's value; `ils_per_usd` is the same thing as the collector wrote it, read when `currency` is ILS and the display currency USD. Without either, today's rate applies. Appended by the payments script; edited or removed only by hand. |
+| `adjustments` | signed amounts added to a partner's balance (positive = owes more); `rate` as above. |
 | `excluded` | feed row `id`s that must not count (shown, struck through). |
 
 ## 4. Balance rule
@@ -108,8 +116,9 @@ value(row)    = amount converted to display_currency
                  amount counts, see §9)
 total         = Σ value(counted rows)
 share[p]      = total × shares[p]                       for each partner p ≠ paid_by
-paid[p]       = Σ value(settlements by p)
-adjusted[p]   = Σ value(adjustments for p)
+paid[p]       = Σ value(settlements by p)      (a settlement with its own `rate` converts at
+                                                 that rate, not today's)
+adjusted[p]   = Σ value(adjustments for p)     (same)
 balance[p]    = share[p] − paid[p] + adjusted[p]       (< 0 → paid_by owes p)
 last_payment  = latest settlement date by any partner ≠ paid_by (null if none)
 since_last    = Σ value(counted rows with date > last_payment)   (no payment → = total)
@@ -125,8 +134,9 @@ the page; history rows and settlements never do.
 Rates are fetched at load for the currencies present, base = `display_currency`:
 Frankfurter (`api.frankfurter.app/latest?from=USD&to=ILS,…`), then
 `open.er-api.com/v6/latest/USD`, then a built-in last-known table (shown as "offline
-rate"). Everything, including old shekel payments, converts at today's rate, as the old
-page did. The rate and its date are printed under the balance.
+rate"). Receipts convert at today's rate. A payment converts at the rate recorded on it
+(§3), else at today's rate as the old page did. The rate and its date are printed under
+the balance; a payment's recorded rate is printed in its settle note.
 
 ## 6. Payments
 
@@ -149,8 +159,10 @@ Button "+ Add payment" on the summary card opens a form: date (default today), p
 2. Reads `projects.json` from `idododan/expense-split` (the project → repo map), then
    `accounting_path` from the project's repo through the Contents API with
    `GITHUB_TOKEN` (fine-grained, contents read/write on the data repos only).
-3. Appends `{id:"p-<date>-<n>", date, paid_by, amount, currency, note, added_at, added_by:"web"}`
-   to `settlements`, writes the file back with the file's `sha` (one retry on a 409),
+3. Looks up the rate on the payment date when the currency differs from the display
+   currency (`api.frankfurter.app/<date>?from=USD&to=ILS`; skipped if that fails), then
+   appends `{id:"p-<date>-<n>", date, by, amount, currency, note, rate?, added_at, added_by:"web"}`
+   to `settlements` and writes the file back with the file's `sha` (one retry on a 409),
    commit message `payment: Guy ₪465 on 2026-08-13`.
 4. Returns `{ok:true, commit:"<sha>", accounting:{…}}`. The page renders the returned
    file at once; the next load reads it from GitHub.
@@ -163,13 +175,14 @@ with the same fields.
 
 | Tool | Does |
 |---|---|
-| `tools/migrate_with_claude.py IN.html OUT.json` | turns the old page into the MGS `accounting.json`: every `ALL_RECEIPTS` row → `history` (reference = receipt number, pre-June rows included), the three `SETTLEMENTS`, start 2026-06-07, Ido/Guy 0.5/0.5, vendors `*`. |
+| `tools/migrate_with_claude.py IN.html OUT.json [--rates]` | turns the old page into the MGS `accounting.json`: every `ALL_RECEIPTS` row → `history` (reference = receipt number, pre-June rows included), the three `SETTLEMENTS` (`--rates` adds each shekel payment's Frankfurter rate on its date), start 2026-06-07, Ido/Guy 0.5/0.5, vendors `*`. The collector already published the equivalent file; this tool reproduces it (same rows, same rates) and stays for the record. |
 | `tools/new_accounting.py --out OUT.json --project ID --start DATE --partners Ido:0.5 Omri:0.5` | an empty-history accounting file. |
 | `tools/check_balance.py PROJECT [--vendors Anthropic] [--rate 3.6] [--dir local/…]` | §4 in Python, prints counted rows, total, since-last, balance; `--vendors Anthropic` reproduces the old page's Claude-only view and prints the difference. |
 | `tools/test_ledger.js` | runs `computeLedger` from `app.js` under Node against the local MGS data and fixed cases. |
 
 `local/<project>/expenses.json` is a copy of the sample feed; `local/<project>/accounting.json`
-is generated. Both are committed so `source=local` works on Pages too.
+is a copy of the live file (2026-11-08). Both are committed so `source=local` works on
+Pages too.
 
 ## 8. Page
 
@@ -196,6 +209,12 @@ scrubbed of "Your receipt from …", the merchant name and the reference; else t
 
 ## 9. Choices made here (owner to confirm at review)
 
+0. **Payments convert at the rate of their payment day** when the file records one, as
+   the collector's MGS file does for the two shekel payments. The brief said "today's
+   rate, as the old page does"; with today's rate Guy's balance drifts with the shekel
+   (on 2026-11-08: $191.04 Claude-only, $17.38 "carried over" that is pure FX drift),
+   with recorded rates it is $173.74, nine cents from the old page's $173.66. Deleting
+   `ils_per_usd` from the file restores today's-rate behaviour; nothing else changes.
 1. **Display currency.** USD for MGS, as the brief says. The old page actually shows its
    totals in ₪ with $ per receipt; the new page shows $ with ₪ per receipt.
 2. **Shared Anthropic receipts.** Since Sep 2026 the Anthropic receipts are in both

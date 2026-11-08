@@ -1,8 +1,7 @@
 {
-  "schema": 1,
   "project": "mgs",
-  "accounting_start": "2026-06-07",
   "display_currency": "USD",
+  "accounting_start": "2026-06-07",
   "paid_by": "Ido",
   "partners": [
     {
@@ -15,265 +14,259 @@
     }
   ],
   "vendors": "*",
+  "excluded": [],
   "history": [
     {
       "date": "2026-03-13",
       "merchant": "Anthropic",
-      "description": "Claude Pro (Mar 13–Apr 13)",
+      "reference": "2268-6793-0467",
       "amount": 20.0,
       "currency": "USD",
-      "reference": "2268-6793-0467",
+      "desc": "Claude Pro (Mar 13–Apr 13)",
       "paid_by": "Ido"
     },
     {
       "date": "2026-03-18",
       "merchant": "Anthropic",
-      "description": "Prepaid extra usage, Individual plan",
-      "amount": 5.0,
-      "currency": "USD",
       "reference": "2006-9180-0924",
-      "paid_by": "Ido"
-    },
-    {
-      "date": "2026-03-18",
-      "merchant": "Anthropic",
-      "description": "Prepaid extra usage, Individual plan",
       "amount": 5.0,
       "currency": "USD",
-      "reference": "2338-3261-4685",
+      "desc": "Prepaid extra usage, Individual plan",
       "paid_by": "Ido"
     },
     {
       "date": "2026-03-18",
       "merchant": "Anthropic",
-      "description": "Auto recharge extra usage, Individual",
+      "reference": "2338-3261-4685",
+      "amount": 5.0,
+      "currency": "USD",
+      "desc": "Prepaid extra usage, Individual plan",
+      "paid_by": "Ido"
+    },
+    {
+      "date": "2026-03-18",
+      "merchant": "Anthropic",
+      "reference": "2745-0946-9844",
       "amount": 11.21,
       "currency": "USD",
-      "reference": "2745-0946-9844",
+      "desc": "Auto recharge extra usage, Individual",
       "paid_by": "Ido"
     },
     {
       "date": "2026-03-18",
       "merchant": "Anthropic",
-      "description": "Prepaid extra usage, Individual plan",
+      "reference": "2834-0651-6648",
       "amount": 5.0,
       "currency": "USD",
-      "reference": "2834-0651-6648",
+      "desc": "Prepaid extra usage, Individual plan",
       "paid_by": "Ido"
     },
     {
       "date": "2026-04-13",
       "merchant": "Anthropic",
-      "description": "Claude Pro (Apr 13–May 13)",
+      "reference": "2528-0892-2975",
       "amount": 20.0,
       "currency": "USD",
-      "reference": "2528-0892-2975",
+      "desc": "Claude Pro (Apr 13–May 13)",
       "paid_by": "Ido"
     },
     {
       "date": "2026-04-28",
       "merchant": "Anthropic",
-      "description": "Max plan – 5x (Apr 28–May 28)",
+      "reference": "2564-6442-9722",
       "amount": 89.78,
       "currency": "USD",
-      "reference": "2564-6442-9722",
+      "desc": "Max plan – 5x (Apr 28–May 28)",
       "paid_by": "Ido"
     },
     {
       "date": "2026-04-28",
       "merchant": "Anthropic",
-      "description": "Prepaid extra usage, Individual plan",
+      "reference": "2756-8870-6252",
       "amount": 45.0,
       "currency": "USD",
-      "reference": "2756-8870-6252",
+      "desc": "Prepaid extra usage, Individual plan",
       "paid_by": "Ido"
     },
     {
       "date": "2026-05-28",
       "merchant": "Anthropic",
-      "description": "Claude Pro (May 28–Jun 28)",
+      "reference": "2727-7664-9379",
       "amount": 20.0,
       "currency": "USD",
-      "reference": "2727-7664-9379",
+      "desc": "Claude Pro (May 28–Jun 28)",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-07",
       "merchant": "Anthropic",
-      "description": "One-time credit purchase",
+      "reference": "2055-4744-5590",
       "amount": 5.0,
       "currency": "USD",
-      "reference": "2055-4744-5590",
+      "desc": "One-time credit purchase",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-13",
       "merchant": "Anthropic",
-      "description": "Max plan – 5x (Jun 13–Jul 13)",
+      "reference": "2595-5003-9268",
       "amount": 90.54,
       "currency": "USD",
-      "reference": "2595-5003-9268",
+      "desc": "Max plan – 5x (Jun 13–Jul 13)",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-17",
       "merchant": "Anthropic",
-      "description": "One-time credit purchase",
+      "reference": "2485-3157-9637",
       "amount": 20.0,
       "currency": "USD",
-      "reference": "2485-3157-9637",
+      "desc": "One-time credit purchase",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-17",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2837-4682-1304",
       "amount": 15.23,
       "currency": "USD",
-      "reference": "2837-4682-1304",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-18",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2421-9425-6023",
       "amount": 11.36,
       "currency": "USD",
-      "reference": "2421-9425-6023",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-18",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2649-5554-0746",
       "amount": 10.89,
       "currency": "USD",
-      "reference": "2649-5554-0746",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-18",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2990-2991-9589",
       "amount": 10.54,
       "currency": "USD",
-      "reference": "2990-2991-9589",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-20",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2574-6697-3096",
       "amount": 10.73,
       "currency": "USD",
-      "reference": "2574-6697-3096",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-23",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2778-6990-3362",
       "amount": 10.06,
       "currency": "USD",
-      "reference": "2778-6990-3362",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-06-28",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2854-4435-0055",
       "amount": 10.11,
       "currency": "USD",
-      "reference": "2854-4435-0055",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-07-04",
       "merchant": "Anthropic",
-      "description": "Auto recharge extra usage, Individual",
+      "reference": "2173-3028-9439",
       "amount": 11.58,
       "currency": "USD",
-      "reference": "2173-3028-9439",
+      "desc": "Auto recharge extra usage, Individual",
       "paid_by": "Ido"
     },
     {
       "date": "2026-07-09",
       "merchant": "Anthropic",
-      "description": "Auto recharge extra usage, Individual",
+      "reference": "2848-5968-3195",
       "amount": 17.51,
       "currency": "USD",
-      "reference": "2848-5968-3195",
+      "desc": "Auto recharge extra usage, Individual",
       "paid_by": "Ido"
     },
     {
       "date": "2026-07-12",
       "merchant": "Anthropic",
-      "description": "Auto recharge extra usage, Individual",
+      "reference": "2625-6512-4080",
       "amount": 15.76,
       "currency": "USD",
-      "reference": "2625-6512-4080",
+      "desc": "Auto recharge extra usage, Individual",
       "paid_by": "Ido"
     },
     {
       "date": "2026-07-13",
       "merchant": "Anthropic",
-      "description": "Max plan – 5x (Jul 13–Aug 13)",
+      "reference": "2255-1861-9763",
       "amount": 100.0,
       "currency": "USD",
-      "reference": "2255-1861-9763",
+      "desc": "Max plan – 5x (Jul 13–Aug 13)",
       "paid_by": "Ido"
     },
     {
       "date": "2026-07-13",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2529-0900-1189",
       "amount": 10.11,
       "currency": "USD",
-      "reference": "2529-0900-1189",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     },
     {
       "date": "2026-07-14",
       "merchant": "Anthropic",
-      "description": "Auto-recharge credits",
+      "reference": "2872-6708-2120",
       "amount": 10.29,
       "currency": "USD",
-      "reference": "2872-6708-2120",
+      "desc": "Auto-recharge credits",
       "paid_by": "Ido"
     }
   ],
   "settlements": [
     {
-      "id": "p-2026-06-18-1",
       "date": "2026-06-18",
-      "paid_by": "Guy",
+      "by": "Guy",
       "amount": 65.39,
       "currency": "USD",
-      "note": "his half of the first $130.77",
-      "added_at": "2026-11-08T08:18:59Z",
-      "added_by": "migration"
+      "note": "his half of the first $130.77"
     },
     {
-      "id": "p-2026-07-14-1",
       "date": "2026-07-14",
-      "paid_by": "Guy",
+      "by": "Guy",
       "amount": 347.0,
       "currency": "ILS",
       "note": "his half of Jun–Jul spending",
-      "added_at": "2026-11-08T08:18:59Z",
-      "added_by": "migration"
+      "ils_per_usd": 3.0139
     },
     {
-      "id": "p-2026-08-13-1",
       "date": "2026-08-13",
-      "paid_by": "Guy",
+      "by": "Guy",
       "amount": 465.0,
       "currency": "ILS",
       "note": "his half of spending through mid-Aug",
-      "added_at": "2026-11-08T08:18:59Z",
-      "added_by": "migration"
+      "ils_per_usd": 2.981
     }
   ],
   "adjustments": [],
-  "excluded": []
+  "migrated_from": "idododan/With-Claude spending.html"
 }
