@@ -164,7 +164,7 @@ with the same fields.
 | Tool | Does |
 |---|---|
 | `tools/migrate_with_claude.py IN.html OUT.json` | turns the old page into the MGS `accounting.json`: every `ALL_RECEIPTS` row → `history` (reference = receipt number, pre-June rows included), the three `SETTLEMENTS`, start 2026-06-07, Ido/Guy 0.5/0.5, vendors `*`. |
-| `tools/new_accounting.py --project ID --name … --start DATE --partners Ido:0.5 Omri:0.5 OUT.json` | an empty-history accounting file. |
+| `tools/new_accounting.py --out OUT.json --project ID --start DATE --partners Ido:0.5 Omri:0.5` | an empty-history accounting file. |
 | `tools/check_balance.py PROJECT [--vendors Anthropic] [--rate 3.6] [--dir local/…]` | §4 in Python, prints counted rows, total, since-last, balance; `--vendors Anthropic` reproduces the old page's Claude-only view and prints the difference. |
 | `tools/test_ledger.js` | runs `computeLedger` from `app.js` under Node against the local MGS data and fixed cases. |
 

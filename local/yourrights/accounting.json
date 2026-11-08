@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "project": "yourrights",
+  "accounting_start": "2026-09-01",
+  "display_currency": "USD",
+  "paid_by": "Ido",
+  "partners": [
+    {
+      "name": "Ido",
+      "share": 0.5
+    },
+    {
+      "name": "Omri",
+      "share": 0.5
+    }
+  ],
+  "vendors": "*",
+  "history": [],
+  "settlements": [],
+  "adjustments": [],
+  "excluded": []
+}
