@@ -27,12 +27,12 @@ test("brief §6: after Guy's last payment (2026-08-13) = $347.31 over 7 rows", f
   assert.deepEqual(dates, ["2026-08-15", "2026-09-07", "2026-09-09", "2026-10-07", "2026-10-24", "2026-10-24", "2026-11-07"]);
 });
 
-test("balance = share − settlements (ILS at the given rate)", function () {
+test("balance = share − settlements (shekel payments at their own dates' rates)", function () {
   var rate = 3.0;
   var m = core.compute(feed, acc, { ilsPerUsd: rate, only: ["Anthropic"] });
   var guy = m.balances[0];
   assert.equal(guy.partner, "Guy");
-  var paid = 65.39 + 347 / rate + 465 / rate;
+  var paid = 65.39 + 347 / 3.0139 + 465 / 2.981; // each payment at its own date's rate
   assert.equal(r2(guy.paid), r2(paid));
   assert.equal(r2(guy.balance), r2(1020.51 / 2 - paid));
   assert.equal(r2(guy.sinceShare), 173.66);
@@ -89,6 +89,7 @@ test("describe() strips vendor boilerplate", function () {
 test("a payment with its own rate does not move with today's rate", function () {
   var a = JSON.parse(JSON.stringify(acc));
   a.settlements[2].ils_per_usd = 3.1;                // ₪465 on Aug 13
+  delete a.settlements[1].ils_per_usd;               // ₪347 on Jul 14: no rate, so today's
   var x = core.compute(feed, a, { ilsPerUsd: 3.0, only: ["Anthropic"] });
   var y = core.compute(feed, a, { ilsPerUsd: 4.0, only: ["Anthropic"] });
   assert.equal(r2(x.settlements[2].value), r2(465 / 3.1));

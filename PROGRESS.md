@@ -33,8 +33,10 @@ the page fell back to ₪3.0129), the `github` source, and the Apps Script.
 ## Phase C — Live wiring (owner's go 2026-11-08) — in progress
 - ✅ `idododan/yourrights-expenses`: `data/accounting.json` committed (342b283);
   `projects.json` → yourrights reads from `github`.
-- ⏳ `idododan/mgs-expenses`: `data/accounting.json` not committed yet (this session
-  could not attach the repo). Needs the two Frankfurter rates first (`--rate`).
+- ✅ `idododan/mgs-expenses`: `data/accounting.json` committed, with the owner's
+  Frankfurter rates for the ₪ payments (Jul 14 ₪3.0139, Aug 13 ₪2.981);
+  `projects.json` → mgs reads from `github`. MGS now: Guy owes $182.58
+  (Claude only $173.74 vs the old page's $173.66; $0.09 carried over).
 - ⏳ Apps Script: owner's token (expected 2026-11-09) + PINs, deploy, URL in
   `projects.json`.
 - ⏳ GitHub Pages for `idododan/expense-split` (needs the code on `main`).

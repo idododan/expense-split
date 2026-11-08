@@ -255,14 +255,16 @@
       "by": "Guy",
       "amount": 347.0,
       "currency": "ILS",
-      "note": "his half of Jun–Jul spending"
+      "note": "his half of Jun–Jul spending",
+      "ils_per_usd": 3.0139
     },
     {
       "date": "2026-08-13",
       "by": "Guy",
       "amount": 465.0,
       "currency": "ILS",
-      "note": "his half of spending through mid-Aug"
+      "note": "his half of spending through mid-Aug",
+      "ils_per_usd": 2.981
     }
   ],
   "adjustments": [],

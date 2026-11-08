@@ -5,7 +5,7 @@
       "name": "MGS-Finance / TRS",
       "repo": "idododan/mgs-expenses",
       "branch": "main",
-      "source": "local",
+      "source": "github",
       "local": {
         "expenses": "handover/samples/expenses-mgs.json",
         "accounting": "data-local/mgs/accounting.json"
