@@ -48,7 +48,7 @@ var sandbox = {
     opts = opts || {};
     function resp(code, body) { return { getResponseCode: function () { return code; }, getContentText: function () { return body; } }; }
     var m;
-    if ((m = url.match(/^https:\/\/api\.frankfurter\.app\/(\d{4}-\d{2}-\d{2})\?from=(\w+)&to=(\w+)$/))) {
+    if ((m = url.match(/^https:\/\/api\.frankfurter\.dev\/v1\/(\d{4}-\d{2}-\d{2})\?base=(\w+)&symbols=(\w+)$/))) {
       if (!frankfurter.ok) return resp(500, 'boom');
       var rates = {}; rates[m[3]] = frankfurter.rate;
       return resp(200, JSON.stringify({ date: m[1], rates: rates }));
