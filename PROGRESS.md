@@ -3,12 +3,22 @@
 Phases from `handover/BRIEF.md` §8. Newest first. Each entry: what was done, how it was
 checked, what is open.
 
-## ⏸ Stopped for the owner's review (2026-11-08)
+## ⏸ Waiting for the owner: deploy and push (2026-11-08)
 
-The app runs locally with the MGS numbers from the brief. Before cut-over the owner
-decides on `SPEC.md` §9 (items 0–5), deploys the Apps Script (steps in
-`apps-script/Code.gs` header), puts its URL in `projects.json`, and pushes `main` to
-`idododan/expense-split` with GitHub Pages on. Nothing has been pushed yet.
+The app runs locally with the MGS numbers from the brief. The owner decided `SPEC.md` §9
+items 0–2 (per-day rates, USD, shared receipts in full). Left for the owner: deploy the
+Apps Script (steps in the `apps-script/Code.gs` header), put its URL in `projects.json`,
+say when to merge and push `main` to `idododan/expense-split`, enable GitHub Pages, then
+the cut-over of the brief's §7. Nothing has been pushed yet.
+
+## Review follow-up — rates per day (2026-11-08)
+
+- Owner's principle: a partner's payment covers their share of what the owner actually
+  paid. So receipts in other currencies now convert at the ECB rate of their own date
+  (one Frankfurter series request per load), payments at their recorded rate or their
+  date's rate; nothing drifts with today's rate. `tools/check_balance.py` does the same.
+- Checked: `node tools/test_ledger.js` (56 checks); checker and app agree on the live
+  series to the cent.
 
 ## Phase 4 — payments (2026-11-08)
 

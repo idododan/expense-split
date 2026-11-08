@@ -160,6 +160,12 @@ rows (Aug 15, Sep 7, Sep 9, Oct 7, Oct 24 ×2, Nov 7). Use these to check your n
   project has no code yet; the build pastes the payments script into it and deploys it
   as a web app (Execute as Me, access Anyone), as in `samples/with-claude/Code.gs`.
 
+- Answered at the build review (owner, 2026-11-08): every amount is valued at the
+  exchange rate of its own day ("whatever makes their share of my own expense covered"),
+  USD stays the MGS display currency, and a shared Anthropic receipt counts in full in
+  both projects (Guy pays half in MGS, Omri half of the same receipt in YourRights).
+  Details: `SPEC.md` §9.
+
 ## 10. Status at handover (2026-11-08)
 
 - All three repos exist and are public. The collector has published the first

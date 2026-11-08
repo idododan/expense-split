@@ -88,7 +88,9 @@
    * computeLedger(feed, accounting, rates) → ledger
    *   feed       the project's expenses.json ({expenses:[…]}) or null
    *   accounting the project's accounting.json
-   *   rates      {CUR: units of CUR per 1 display-currency unit}; display currency = 1
+   *   rates      {CUR: r} where r is a number (units of CUR per 1 display-currency unit)
+   *              or { latest: number, byDate: {'YYYY-MM-DD': number} } — then each row,
+   *              payment and adjustment converts at the rate of its own date (SPEC §5)
    * Pure: no DOM, no network, no Date.now().
    */
   function computeLedger(feed, rawAcc, rates) {
@@ -107,16 +109,25 @@
     (acc.partners || []).forEach(function (p) { shares[p.name] = p.share; });
     var paidBy = acc.paid_by;
 
-    function rate(cur) {
+    function rateFor(cur, date) {
       cur = cur || base;
       if (cur === base) return 1;
       var r = rates && rates[cur];
-      if (!r) throw new Error('no rate for ' + cur);
-      return r;
+      if (typeof r === 'number') return r;
+      if (!r || (!r.byDate && !r.latest)) throw new Error('no rate for ' + cur);
+      var best = null;
+      if (r.byDate && date) {                                    // the latest quote on or before that day
+        Object.keys(r.byDate).forEach(function (d) { if (d <= date && (!best || d > best)) best = d; });
+        if (!best) { Object.keys(r.byDate).forEach(function (d) { if (!best || d < best) best = d; }); }
+      }
+      if (best) return r.byDate[best];
+      if (r.latest) return r.latest;
+      throw new Error('no rate for ' + cur);
     }
-    function value(amount, cur) { return amount / rate(cur); }
-    /** A settlement or adjustment: its own recorded rate wins over today's. */
-    function valueOf(x) { return x.rate && x.currency !== base ? x.amount / x.rate : value(x.amount, x.currency); }
+    function value(amount, cur, date) { return amount / rateFor(cur, date); }
+    /** A settlement or adjustment: its own recorded rate wins; else the rate of its date. */
+    function valueOf(x) { return x.rate && x.currency !== base ? x.amount / x.rate : value(x.amount, x.currency, x.date); }
+    function rateUsed(x) { return x.currency === base ? 1 : (x.rate || rateFor(x.currency, x.date)); }
 
     // rows = feed ∪ history, deduplicated by reference (feed wins; history description shown)
     var rows = [];
@@ -156,7 +167,7 @@
       else if (row.amount == null) reason = 'no_amount';
       row.counted = reason === null;
       row.reason = reason;
-      row.value = row.amount == null ? null : value(row.amount, row.currency);
+      row.value = row.amount == null ? null : value(row.amount, row.currency, row.date);
     });
     rows.sort(function (a, b) {
       if (a.date !== b.date) return a.date < b.date ? 1 : -1;      // newest first
@@ -198,7 +209,7 @@
       total: total, sinceRows: sinceRows, sinceLast: sinceLast, lastPayment: lastPayment,
       partners: partners, settlements: settlements, recent: recent, earlier: earlier,
       pending: rows.filter(function (r) { return r.reason === 'no_amount'; }).length,
-      value: value, valueOf: valueOf
+      value: value, valueOf: valueOf, rateFor: rateFor, rateUsed: rateUsed
     };
   }
 
@@ -226,15 +237,40 @@
     return out;
   }
 
-  function fetchRates(base, currencies) {
-    if (!currencies.length) return Promise.resolve({ rates: {}, live: true, source: 'none', date: null });
+  function earliestDate(feed, acc) {
+    var dates = [acc.accounting_start];
+    (feed && feed.expenses || []).forEach(function (r) { if (r.date) dates.push(r.date); });
+    (acc.history || []).forEach(function (h) { if (h.date) dates.push(h.date); });
+    (acc.settlements || []).forEach(function (x) { if (x.date) dates.push(x.date); });
+    (acc.adjustments || []).forEach(function (x) { if (x.date) dates.push(x.date); });
+    return dates.filter(Boolean).sort()[0];
+  }
+
+  /** Daily ECB rates since `since` (Frankfurter), else today's flat rate (two services), else the offline table. */
+  function fetchRates(base, currencies, since) {
+    if (!currencies.length) return Promise.resolve({ rates: {}, live: true, source: 'none', date: null, daily: false });
     var to = currencies.join(',');
-    return fetch('https://api.frankfurter.app/latest?from=' + base + '&to=' + to)
+    return fetch('https://api.frankfurter.app/' + since + '..?from=' + base + '&to=' + to)
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d || !d.rates) throw new Error('no rates');
-        currencies.forEach(function (c) { if (!d.rates[c]) throw new Error('no rate ' + c); });
-        return { rates: d.rates, live: true, source: 'Frankfurter', date: d.date };
+        if (!d || !d.rates || !d.end_date) throw new Error('no series');
+        var out = {};
+        currencies.forEach(function (c) {
+          var byDate = {};
+          Object.keys(d.rates).forEach(function (day) { if (d.rates[day][c]) byDate[day] = d.rates[day][c]; });
+          if (!Object.keys(byDate).length) throw new Error('no rate ' + c);
+          out[c] = { latest: d.rates[d.end_date] && d.rates[d.end_date][c] || byDate[Object.keys(byDate).sort().pop()], byDate: byDate };
+        });
+        return { rates: out, live: true, source: 'Frankfurter', date: d.end_date, daily: true };
+      })
+      .catch(function () {
+        return fetch('https://api.frankfurter.app/latest?from=' + base + '&to=' + to)
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d || !d.rates) throw new Error('no rates');
+            currencies.forEach(function (c) { if (!d.rates[c]) throw new Error('no rate ' + c); });
+            return { rates: d.rates, live: true, source: 'Frankfurter', date: d.date, daily: false };
+          });
       })
       .catch(function () {
         return fetch('https://open.er-api.com/v6/latest/' + base)
@@ -243,11 +279,11 @@
             if (!d || !d.rates) throw new Error('no rates');
             var out = {};
             currencies.forEach(function (c) { if (!d.rates[c]) throw new Error('no rate ' + c); out[c] = d.rates[c]; });
-            return { rates: out, live: true, source: 'open.er-api', date: (d.time_last_update_utc || '').slice(5, 16) };
+            return { rates: out, live: true, source: 'open.er-api', date: (d.time_last_update_utc || '').slice(5, 16), daily: false };
           });
       })
       .catch(function () {
-        return { rates: fallbackRates(base, currencies), live: false, source: 'offline', date: null };
+        return { rates: fallbackRates(base, currencies), live: false, source: 'offline', date: null, daily: false };
       });
   }
 
@@ -381,7 +417,7 @@
       if (p.lastSettlement) {
         var s = p.lastSettlement;
         var paidStr = fmtMoney(s.amount, s.currency, { whole: true });
-        if (s.currency !== base) paidStr += ' (~' + fmtMoney(ledger.valueOf(s), base) + (s.rate ? ', at ' + fmtMoney(s.rate, s.currency) + ' then' : '') + ')';
+        if (s.currency !== base) paidStr += ' (~' + fmtMoney(ledger.valueOf(s), base) + ', at ' + fmtMoney(ledger.rateUsed(s), s.currency) + ' then)';
         h += '<div class="settle-note">✅ ' + esc(p.name) + ' paid ' + esc(paidStr) + ' on ' + esc(fmtDate(s.date, true)) +
           (s.note ? ' · ' + esc(s.note) : '') + '</div>';
       }
@@ -420,8 +456,13 @@
     var fx = state.fx, base = ledger.base;
     var keys = Object.keys(fx.rates || {}).filter(function (c) { return c !== base; });
     if (!keys.length) return '';
-    var parts = keys.map(function (c) { return '1 ' + base + ' = ' + fmtMoney(fx.rates[c], c); });
-    return parts.join(' · ') + (fx.live ? (fx.date ? ' (' + fx.date + ')' : ' (live)') : ' (offline rate)');
+    var parts = keys.map(function (c) {
+      var r = fx.rates[c]; var latest = typeof r === 'number' ? r : r.latest;
+      return '1 ' + base + ' = ' + fmtMoney(latest, c);
+    });
+    var tail = fx.daily ? ' · each receipt and payment at the ECB rate of its own day'
+             : fx.live ? ' · today\u2019s rate for every date' : ' · offline rate for every date';
+    return (fx.date ? 'latest ' : '') + parts.join(' · ') + (fx.date ? ' (' + fx.date + ')' : '') + tail;
   }
 
   // ───────────────────────────── payments (SPEC §6) ─────────────────────────────
@@ -535,7 +576,8 @@
           var need = neededCurrencies(state.feed, state.acc);
           state.fx = { rates: fallbackRates(state.acc.display_currency || 'USD', need), live: false, source: 'offline', date: null };
           render();                                             // paint at once with the fallback rate
-          return fetchRates(state.acc.display_currency || 'USD', need).then(function (fx) { state.fx = fx; render(); });
+          return fetchRates(state.acc.display_currency || 'USD', need, earliestDate(state.feed, state.acc))
+            .then(function (fx) { state.fx = fx; render(); });
         }
         render();
       })
@@ -563,7 +605,7 @@
   }
 
   var api = { computeLedger: computeLedger, normalizeAccounting: normalizeAccounting, scrubDescription: scrubDescription, fmtMoney: fmtMoney,
-              neededCurrencies: neededCurrencies, fallbackRates: fallbackRates };
+              neededCurrencies: neededCurrencies, fallbackRates: fallbackRates, earliestDate: earliestDate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else {
     global.ExpenseSplit = api;

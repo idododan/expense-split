@@ -110,14 +110,14 @@ counted(row)  = date ≥ accounting_start
               ∧ (vendors = "*" ∨ merchant ∈ vendors)
               ∧ id ∉ excluded
               ∧ amount ≠ null
-value(row)    = amount converted to display_currency
+value(row)    = amount converted to display_currency at the rate of the row's date (§5)
                 (for a shared row with `receipt_total` set, `amount` is already this
                  project's part — never divide again; with `receipt_total` null the full
                  amount counts, see §9)
 total         = Σ value(counted rows)
 share[p]      = total × shares[p]                       for each partner p ≠ paid_by
 paid[p]       = Σ value(settlements by p)      (a settlement with its own `rate` converts at
-                                                 that rate, not today's)
+                                                 that rate, else at the rate of its date)
 adjusted[p]   = Σ value(adjustments for p)     (same)
 balance[p]    = share[p] − paid[p] + adjusted[p]       (< 0 → paid_by owes p)
 last_payment  = latest settlement date by any partner ≠ paid_by (null if none)
@@ -131,12 +131,18 @@ the page; history rows and settlements never do.
 
 ## 5. Currency
 
-Rates are fetched at load for the currencies present, base = `display_currency`:
-Frankfurter (`api.frankfurter.app/latest?from=USD&to=ILS,…`), then
-`open.er-api.com/v6/latest/USD`, then a built-in last-known table (shown as "offline
-rate"). Receipts convert at today's rate. A payment converts at the rate recorded on it
-(§3), else at today's rate as the old page did. The rate and its date are printed under
-the balance; a payment's recorded rate is printed in its settle note.
+Principle (owner, 2026-11-08): a partner's payment must cover their share of what the
+owner actually paid, so every amount is valued on the day it happened and the balance
+never drifts with the exchange rate.
+
+At load the page fetches the daily ECB series for the currencies present, base =
+`display_currency`, from the earliest date in the data
+(`api.frankfurter.app/<since>..?from=USD&to=ILS,…`, one request). Each receipt,
+payment and adjustment converts at the quote of its own date (the latest quote on or
+before it; weekends take Friday's). A payment with a recorded `rate` (§3) uses that
+instead. Fallbacks, in order: Frankfurter's latest rate for every date, then
+`open.er-api.com`, then a built-in last-known table; the line under the balance says
+which applies. A payment's rate is printed in its settle note.
 
 ## 6. Payments
 
@@ -207,23 +213,20 @@ footer: Since Jun 7: $1,020.51 spent · Guy paid $335.74 · 35 receipts · feed 
 Description = the history row's `description` when matched, else the feed `subject`
 scrubbed of "Your receipt from …", the merchant name and the reference; else the merchant.
 
-## 9. Choices made here (owner to confirm at review)
+## 9. Choices made here — decided by the owner on 2026-11-08
 
-0. **Payments convert at the rate of their payment day** when the file records one, as
-   the collector's MGS file does for the two shekel payments. The brief said "today's
-   rate, as the old page does"; with today's rate Guy's balance drifts with the shekel
-   (on 2026-11-08: $191.04 Claude-only, $17.38 "carried over" that is pure FX drift),
-   with recorded rates it is $173.74, nine cents from the old page's $173.66. Deleting
-   `ils_per_usd` from the file restores today's-rate behaviour; nothing else changes.
-1. **Display currency.** USD for MGS, as the brief says. The old page actually shows its
-   totals in ₪ with $ per receipt; the new page shows $ with ₪ per receipt.
-2. **Shared Anthropic receipts.** Since Sep 2026 the Anthropic receipts are in both
-   feeds with `receipt_total: null`, so each project counts the full amount: Guy owes half
-   of each in MGS and Omri owes half of the same receipt in YourRights. That follows the
-   brief and the contract ("how to divide it is the split apps' business" + "every
-   receipt in a project's feed is split"), and it is what makes the $1,020.51 parity
-   number come out. If the owner wants each project to carry half instead, the collector
-   should export them with `share = "even"`; nothing changes in this app.
+0. **Rates: each amount at the rate of its own day** (owner: "whatever makes their share
+   of my own expense covered"). The brief had said "today's rate, as the old page does";
+   with today's rate Guy's balance drifted with the shekel ($191.04 Claude-only on
+   2026-11-08, $17.38 of it pure FX drift). Per-day rates give $173.74, nine cents from
+   the old page's $173.66. The collector's recorded `ils_per_usd` on the two shekel
+   payments agrees with the ECB series to the fourth decimal.
+1. **Display currency USD** for MGS (owner, same reasoning: the receipts and the card
+   charges are in USD). The old page showed its totals in ₪; the new page shows $ with
+   ₪ per receipt.
+2. **Shared Anthropic receipts count in full in both projects** (owner: "Guy pays half
+   in MGS and Omri pays half of the same receipt in YourRights"). Since Sep 2026 these
+   rows are in both feeds with `receipt_total: null`; nothing changes in the collector.
 3. **Matched history rows keep their description.** The old page's descriptions ("Max
    plan – 5x (Jul 13–Aug 13)") are better than the feed subjects, so when a history row
    matches a feed row the feed's amount counts and the history's description is shown.
