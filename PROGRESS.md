@@ -14,9 +14,7 @@ owner:
    GitHub). A ₪1 `test` row can be removed afterwards by editing `data/accounting.json`
    in `idododan/mgs-expenses`.
 2. Revert the ₪1 test payment (one Terminal line, given in the chat), or leave it.
-3. Decide how Guy and Omri get their pages without seeing each other's (options in the
-   chat; the data repos are public today, so this is more than a URL question).
-4. Cut-over (brief §7): compare with the old page, send Guy and Omri the URLs, leave the
+3. Cut-over (brief §7): compare with the old page, send Guy and Omri the URLs, leave the
    old page up.
 
 ## Review follow-up — the card's shekels (2026-11-08, later)
@@ -31,7 +29,8 @@ owner:
   pair); redeploying is optional.
 - Checked: 73 + 90 checks; eight statement lines reproduce to the agora (one by one
   agora off the card's rounding). MGS on 2026-11-08: Guy owes ₪627.82.
-- Open: Guy and Omri each seeing only their project (owner's question, see the chat).
+- Owner decided (2026-11-08): no access separation, each partner gets their own link
+  (SPEC §9.3). The card's total moved back into the summary card at the owner's request.
 
 ## Review follow-up — rates per day (2026-11-08)
 

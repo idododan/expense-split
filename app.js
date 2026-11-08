@@ -464,6 +464,10 @@
       h += '<div class="since">' + since + '</div>';
     });
     if (ledger.pending) h += '<div class="pending">+ ' + ledger.pending + ' receipt' + (ledger.pending > 1 ? 's' : '') + ' with the amount still pending</div>';
+    var paidAll = others.map(function (p) { return esc(p.name) + ' paid <b>' + esc(fmtMoney(p.paid, base)) + '</b>'; }).join(' · ');
+    h += '<div class="divider"></div>';
+    h += '<div class="totals">Total since ' + esc(fmtDate(ledger.start, true)) + ': <b>' + esc(fmtMoney(ledger.total, base)) + '</b> in ' +
+      ledger.counted.length + ' receipts · ' + paidAll + '</div>';
     var fxLine = rateLine(ledger);
     if (fxLine) h += '<div class="fx">' + esc(fxLine) + '</div>';
     h += '<button class="add-btn" id="add-btn" type="button">+ Add payment</button>';
@@ -485,10 +489,8 @@
     content.innerHTML = h;
 
     // ── footer ──
-    var paidAll = others.map(function (p) { return p.name + ' paid ' + fmtMoney(p.paid, base); }).join(' · ');
-    var gen = feed && feed.generated_at ? ' · feed ' + feed.generated_at.replace('T', ' ').replace(/:\d\dZ$/, '') : '';
-    $('footer-text').textContent = 'Since ' + fmtDate(ledger.start) + ': ' + fmtMoney(ledger.total, base) + ' spent · ' +
-      paidAll + ' · ' + ledger.counted.length + ' receipts' + gen + (state.source === 'local' ? ' · local data' : '');
+    var gen = feed && feed.generated_at ? 'feed updated ' + feed.generated_at.replace('T', ' ').replace(/:\d\dZ$/, '') + ' UTC' : '';
+    $('footer-text').textContent = gen + (state.source === 'local' ? ' · local data' : '');
 
     $('add-btn').onclick = togglePayForm;
     if (state.payFormOpen) openPayForm(savedForm);

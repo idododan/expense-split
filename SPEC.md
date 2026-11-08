@@ -218,6 +218,8 @@ GUY OWES IDO
 ₪627.82
 ✅ Guy paid ₪465 on Aug 13, 2026 · his half of spending through mid-Aug
 New since Aug 13: ₪1,192.60 in 10 receipts, Guy's share ₪596.30 · ₪31.52 still owed from before
+──────────
+Total since Jun 7, 2026: ₪3,264.57 in 38 receipts · Guy paid ₪1,004.47
 latest 1 USD = ₪3.20 (2026-11-06) · ECB rate of the day after each receipt + 3% card fee
 [ + Add payment ]
 Receipts since Aug 13 (7)       newest first: date · merchant · description · amount
@@ -230,6 +232,11 @@ Description = the history row's `description` when matched, else the feed `subje
 scrubbed of "Your receipt from …", the merchant name and the reference; else the merchant.
 
 ## 9. Choices made here — decided by the owner on 2026-11-08
+
+3. **Access.** Both pages stay on the one public site and the data repos stay public
+   (owner, 2026-11-08, "2"): the feeds are pseudonymized, and each partner simply gets
+   their own link. Real separation (private repos, data served through the Apps Script
+   with a per-project view key) was offered and declined for now.
 
 0. **Rates: each amount at the rate of its own day** (owner: "whatever makes their share
    of my own expense covered"). The brief had said "today's rate, as the old page does";
