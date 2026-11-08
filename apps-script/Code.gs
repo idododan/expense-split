@@ -153,7 +153,7 @@ function appendSettlement_(acc, payment) {
 /** Frankfurter's rate for `date` (ECB reference; the latest available on weekends). */
 function rateOn_(date, base, currency) {
   try {
-    var r = UrlFetchApp.fetch('https://api.frankfurter.app/' + date + '?from=' + base + '&to=' + currency,
+    var r = UrlFetchApp.fetch('https://api.frankfurter.dev/v1/' + date + '?base=' + base + '&symbols=' + currency,
                               { muteHttpExceptions: true });
     if (r.getResponseCode() !== 200) return null;
     var d = JSON.parse(r.getContentText());

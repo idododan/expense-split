@@ -27,7 +27,7 @@ def rates_for(base, currencies, since, fixed=None):
             rates[c] = fixed
         return rates, "fixed rate %s for every date" % fixed
     try:
-        url = "https://api.frankfurter.app/%s..?from=%s&to=%s" % (since, base, ",".join(need))
+        url = "https://api.frankfurter.dev/v1/%s..?base=%s&symbols=%s" % (since, base, ",".join(need))
         with urllib.request.urlopen(url, timeout=10) as r:
             d = json.load(r)
         for c in need:

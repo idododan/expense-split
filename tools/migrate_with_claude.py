@@ -81,7 +81,7 @@ def main():
             "added_by": "migration",
         }
         if args.rates and row["currency"] != args.currency:
-            url = "https://api.frankfurter.app/%s?from=%s&to=%s" % (row["date"], args.currency, row["currency"])
+            url = "https://api.frankfurter.dev/v1/%s?base=%s&symbols=%s" % (row["date"], args.currency, row["currency"])
             with urllib.request.urlopen(url, timeout=10) as resp:
                 row["rate"] = json.load(resp)["rates"][row["currency"]]
         settlements.append(row)

@@ -137,7 +137,8 @@ never drifts with the exchange rate.
 
 At load the page fetches the daily ECB series for the currencies present, base =
 `display_currency`, from the earliest date in the data
-(`api.frankfurter.app/<since>..?from=USD&to=ILS,…`, one request). Each receipt,
+(`api.frankfurter.dev/v1/<since>..?base=USD&symbols=ILS,…`, one request; the old
+`api.frankfurter.app` host redirects without CORS headers and fails in browsers). Each receipt,
 payment and adjustment converts at the quote of its own date (the latest quote on or
 before it; weekends take Friday's). A payment with a recorded `rate` (§3) uses that
 instead. Fallbacks, in order: Frankfurter's latest rate for every date, then
@@ -166,7 +167,7 @@ Button "+ Add payment" on the summary card opens a form: date (default today), p
    `accounting_path` from the project's repo through the Contents API with
    `GITHUB_TOKEN` (fine-grained, contents read/write on the data repos only).
 3. Looks up the rate on the payment date when the currency differs from the display
-   currency (`api.frankfurter.app/<date>?from=USD&to=ILS`; skipped if that fails), then
+   currency (`api.frankfurter.dev/v1/<date>?base=USD&symbols=ILS`; skipped if that fails), then
    appends `{id:"p-<date>-<n>", date, by, amount, currency, note, rate?, added_at, added_by:"web"}`
    to `settlements` and writes the file back with the file's `sha` (one retry on a 409),
    commit message `payment: Guy ₪465 on 2026-08-13`.

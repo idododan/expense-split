@@ -6,6 +6,8 @@
   'use strict';
 
   var SYMBOLS = { USD: '$', ILS: '₪', EUR: '€', GBP: '£' };
+  // api.frankfurter.app now 301-redirects here without CORS headers, so browsers must call this host directly.
+  var FRANKFURTER = 'https://api.frankfurter.dev/v1/';
   // Last-known rates, used only when both rate services fail (shown as "offline rate").
   var FALLBACK_RATES = { USD: { ILS: 3.0129, EUR: 0.86, GBP: 0.75 } };
   var FEED_BOILERPLATE = [
@@ -250,7 +252,7 @@
   function fetchRates(base, currencies, since) {
     if (!currencies.length) return Promise.resolve({ rates: {}, live: true, source: 'none', date: null, daily: false });
     var to = currencies.join(',');
-    return fetch('https://api.frankfurter.app/' + since + '..?from=' + base + '&to=' + to)
+    return fetch(FRANKFURTER + since + '..?base=' + base + '&symbols=' + to)
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || !d.rates || !d.end_date) throw new Error('no series');
@@ -264,7 +266,7 @@
         return { rates: out, live: true, source: 'Frankfurter', date: d.end_date, daily: true };
       })
       .catch(function () {
-        return fetch('https://api.frankfurter.app/latest?from=' + base + '&to=' + to)
+        return fetch(FRANKFURTER + 'latest?base=' + base + '&symbols=' + to)
           .then(function (r) { return r.json(); })
           .then(function (d) {
             if (!d || !d.rates) throw new Error('no rates');
