@@ -30,9 +30,10 @@ original brief and must not be edited except to record owner decisions.
 ## Run and check locally
 
 ```sh
-python3 -m http.server 8000              # from the repo root
-open "http://localhost:8000/?project=mgs&source=local"
-node tools/test_ledger.js                # unit tests for the balance rule in app.js
+python3 -m http.server 8765              # from the repo root (8000 is taken by the collector panel)
+open "http://localhost:8765/?project=mgs&source=local"
+node tools/test_ledger.js                # the balance rule in app.js (49 checks)
+node tools/test_apps_script.js           # the payments script with a fake GitHub (85 checks)
 python3 tools/check_balance.py mgs       # same rule in Python, prints the MGS numbers
 ```
 

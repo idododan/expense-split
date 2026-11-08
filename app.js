@@ -299,7 +299,7 @@
   // ───────────────────────────── rendering ─────────────────────────────
 
   var state = { config: null, projectId: null, cfg: null, source: 'github', feed: null, acc: null,
-                fx: { rates: {}, live: false, source: 'offline', date: null }, ledger: null };
+                fx: { rates: {}, live: false, source: 'offline', date: null }, ledger: null, payFormOpen: false };
 
   function $(id) { return document.getElementById(id); }
 
@@ -334,6 +334,7 @@
   function render() {
     var cfg = state.cfg, acc = state.acc, feed = state.feed;
     var content = $('content');
+    var savedForm = state.payFormOpen ? readPayForm() : null;   // survive the re-render when live rates arrive
     $('eyebrow').textContent = 'Shared expenses 💸';
     $('title').textContent = cfg.name;
 
@@ -412,6 +413,7 @@
       paidAll + ' · ' + ledger.counted.length + ' receipts' + gen + (state.source === 'local' ? ' · local data' : '');
 
     $('add-btn').onclick = togglePayForm;
+    if (state.payFormOpen) openPayForm(savedForm);
   }
 
   function rateLine(ledger) {
@@ -426,27 +428,40 @@
 
   function pinKey() { return 'expense-split.pin.' + state.projectId; }
 
-  function togglePayForm() {
+  function readPayForm() {
+    var f = $('pay-form');
+    if (!f) return null;
+    return { date: f.date.value, paid_by: f.paid_by.value, amount: f.amount.value, currency: f.currency.value,
+             note: f.note.value, pin: f.pin.value, status: $('pay-status').textContent };
+  }
+
+  function closePayForm() { state.payFormOpen = false; var slot = $('pay-form-slot'); if (slot) slot.innerHTML = ''; }
+  function togglePayForm() { if (state.payFormOpen) closePayForm(); else openPayForm(null); }
+
+  function openPayForm(saved) {
     var slot = $('pay-form-slot');
-    if (slot.innerHTML) { slot.innerHTML = ''; return; }
+    state.payFormOpen = true;
     var ledger = state.ledger;
     var others = ledger.partners;
     var pin = '';
     try { pin = localStorage.getItem(pinKey()) || ''; } catch (e) { /* private mode */ }
+    saved = saved || {};
     var h = '<form class="pay-form" id="pay-form">';
-    h += '<label>Date <input type="date" name="date" value="' + todayIso() + '" required></label>';
-    h += '<label>Paid by <select name="paid_by">' + others.map(function (p) { return '<option>' + esc(p.name) + '</option>'; }).join('') + '</select></label>';
-    h += '<label>Amount <input type="number" name="amount" step="0.01" min="0.01" inputmode="decimal" required></label>';
-    h += '<label>Currency <select name="currency"><option>ILS</option><option' + (ledger.base === 'USD' ? ' selected' : '') + '>USD</option></select></label>';
-    h += '<label class="wide">Note <input type="text" name="note" maxlength="200" placeholder="optional"></label>';
-    h += '<label>Project PIN <input type="password" name="pin" autocomplete="off" value="' + esc(pin) + '" required></label>';
+    h += '<label>Date <input type="date" name="date" value="' + esc(saved.date || todayIso()) + '" required></label>';
+    h += '<label>Paid by <select name="paid_by">' + others.map(function (p) {
+      return '<option' + (saved.paid_by === p.name ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></label>';
+    h += '<label>Amount <input type="number" name="amount" step="0.01" min="0.01" inputmode="decimal" value="' + esc(saved.amount || '') + '" required></label>';
+    var cur = saved.currency || ledger.base;
+    h += '<label>Currency <select name="currency"><option' + (cur === 'ILS' ? ' selected' : '') + '>ILS</option><option' + (cur === 'USD' ? ' selected' : '') + '>USD</option></select></label>';
+    h += '<label class="wide">Note <input type="text" name="note" maxlength="200" placeholder="optional" value="' + esc(saved.note || '') + '"></label>';
+    h += '<label>Project PIN <input type="password" name="pin" autocomplete="off" value="' + esc(saved.pin != null ? saved.pin : pin) + '" required></label>';
     h += '<div class="actions"><button type="submit" class="primary">Save payment</button><button type="button" id="pay-cancel">Cancel</button></div>';
-    h += '<div class="pay-status" id="pay-status"></div>';
+    h += '<div class="pay-status" id="pay-status">' + esc(saved.status || '') + '</div>';
     h += '</form>';
     slot.innerHTML = h;
-    $('pay-cancel').onclick = function () { slot.innerHTML = ''; };
+    $('pay-cancel').onclick = closePayForm;
     $('pay-form').onsubmit = submitPayment;
-    slot.querySelector('[name=amount]').focus();
+    if (!saved.amount) slot.querySelector('[name=amount]').focus();
   }
 
   function submitPayment(ev) {
@@ -470,6 +485,7 @@
         if (!res || !res.ok) throw new Error(res && res.error ? res.error : 'unexpected answer from the payments script');
         try { localStorage.setItem(pinKey(), payload.pin); } catch (e) { /* ignore */ }
         if (res.accounting) state.acc = res.accounting;
+        closePayForm();
         render();
         showToast('Payment saved ✅' + (res.commit ? ' · commit ' + res.commit.slice(0, 7) : ''));
       })
@@ -531,6 +547,7 @@
     var params = new URLSearchParams(location.search);
     state.projectId = params.get('project');
     state.source = params.get('source') === 'local' ? 'local' : 'github';
+    state.payFormOpen = location.hash === '#pay';                 // deep link straight to the form
     $('refresh-btn').onclick = function () { loadAndRender().then(function () { showToast('Refreshed'); }); };
     localFetchJson('projects.json')
       .then(function (config) {
