@@ -121,7 +121,8 @@ eq('by', last.by, 'Guy');
 eq('amount', last.amount, 600);
 eq('currency', last.currency, 'ILS');
 eq('note', last.note, 'Nov');
-eq('rate recorded', last.rate, 3.21);
+eq('no rate: ILS into a ILS ledger (projects.json says display ILS)', last.rate, undefined);
+eq('no rate_base either', last.rate_base, undefined);
 eq('added_by', last.added_by, 'web');
 eq('added_at iso', /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(last.added_at), true);
 eq('old settlements untouched', written.settlements[0], accounting.settlements[0]);
@@ -137,12 +138,16 @@ res = post(Object.assign({}, base, { amount: 50.5, currency: 'USD', note: '' }))
 eq('ok', res.ok, true);
 last = res.accounting.settlements[res.accounting.settlements.length - 1];
 eq('id increments per day', last.id, 'p-2026-11-08-2');
-eq('no rate for the display currency', last.rate, undefined);
+eq('USD into a ILS ledger, rate service down → no rate, still saved', last.rate, undefined);
 eq('message', puts[1].message, 'payment: Guy $50.50 on 2026-11-08');
+frankfurter.ok = true;
+res = post(Object.assign({}, base, { amount: 7, currency: 'USD', date: '2026-11-07' }));
+eq('USD into a ILS ledger: rate recorded as USD per 1 ILS with rate_base', res.settlement.rate === 3.21 && res.settlement.rate_base === 'ILS', true);
+frankfurter.ok = false;
 res = post(Object.assign({}, base, { amount: 100, currency: 'ILS', date: '2026-11-07' }));
-eq('rate service down → no rate, still saved', res.ok && res.settlement.rate === undefined, true);
+eq('still saved without the rate service', res.ok, true);
 eq('sorted by date', res.accounting.settlements.map(function (s) { return s.date; }).join(','),
-   '2026-06-18,2026-07-14,2026-08-13,2026-11-07,2026-11-08,2026-11-08');
+   '2026-06-18,2026-07-14,2026-08-13,2026-11-07,2026-11-07,2026-11-08,2026-11-08');
 frankfurter.ok = true;
 
 // ── 409 once → re-read and retry ──

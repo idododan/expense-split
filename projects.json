@@ -7,7 +7,12 @@
       "branch": "main",
       "expenses_path": "data/expenses.json",
       "accounting_path": "data/accounting.json",
-      "local": "local/mgs"
+      "local": "local/mgs",
+      "display_currency": "ILS",
+      "card": {
+        "fee": 0.03,
+        "lag_days": 1
+      }
     },
     "yourrights": {
       "name": "YourRights",
@@ -15,7 +20,12 @@
       "branch": "main",
       "expenses_path": "data/expenses.json",
       "accounting_path": "data/accounting.json",
-      "local": "local/yourrights"
+      "local": "local/yourrights",
+      "display_currency": "ILS",
+      "card": {
+        "fee": 0.03,
+        "lag_days": 1
+      }
     }
   }
 }

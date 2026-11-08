@@ -13,12 +13,25 @@ owner:
 1. The first real payment from the page (end-to-end test of browser → Apps Script →
    GitHub). A ₪1 `test` row can be removed afterwards by editing `data/accounting.json`
    in `idododan/mgs-expenses`.
-2. **Card conversion rate.** The owner's actual cost is the card company's shekel
-   charge, not the ECB rate. Proposed: a per-project `card_markup` on top of the daily
-   ECB rate and ₪ as the display currency (SPEC §5/§9 to be updated). Waiting for the
-   markup percentage or one receipt-vs-statement example. Do this before cut-over.
-3. Cut-over (brief §7): compare with the old page, send Guy and Omri the URLs, leave the
+2. Revert the ₪1 test payment (one Terminal line, given in the chat), or leave it.
+3. Decide how Guy and Omri get their pages without seeing each other's (options in the
+   chat; the data repos are public today, so this is more than a URL question).
+4. Cut-over (brief §7): compare with the old page, send Guy and Omri the URLs, leave the
    old page up.
+
+## Review follow-up — the card's shekels (2026-11-08, later)
+
+- Owner: "my rate is the conversion of the credit card company", with eight statement
+  lines. Formula found exact: USD × representative rate of the next day × 1.03. Page and
+  checker now keep the ledger in ILS (`projects.json` overrides `display_currency`),
+  convert dollar receipts with that formula (ECB rate standing in for the BoI rate, ≤0.3%
+  apart), payments without fee. Headline swapped: the balance is the big number.
+- Apps Script: display currency from `projects.json`, `rate_base` written next to
+  `rate`. The deployed version still works with the page (its rows are read as a USD→ILS
+  pair); redeploying is optional.
+- Checked: 73 + 90 checks; eight statement lines reproduce to the agora (one by one
+  agora off the card's rounding). MGS on 2026-11-08: Guy owes ₪627.82.
+- Open: Guy and Omri each seeing only their project (owner's question, see the chat).
 
 ## Review follow-up — rates per day (2026-11-08)
 

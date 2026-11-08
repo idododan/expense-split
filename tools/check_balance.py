@@ -8,6 +8,7 @@
 Reads local/<project>/expenses.json and accounting.json unless --dir is given.
 """
 import argparse
+import datetime as dt
 import json
 import os
 import sys
@@ -57,13 +58,19 @@ def main():
     ap.add_argument("--vendors", nargs="*", help="override the accounting file's vendors list")
     ap.add_argument("--rate", type=float, help="fixed rate for every date (default: Frankfurter daily rates)")
     ap.add_argument("--rows", action="store_true", help="list the counted rows")
+    ap.add_argument("--no-card", action="store_true", help="ignore the card fee/lag from projects.json")
     args = ap.parse_args()
 
     d = args.dir or os.path.join("local", args.project)
     feed = json.load(open(os.path.join(d, "expenses.json"), encoding="utf-8"))
     acc = json.load(open(os.path.join(d, "accounting.json"), encoding="utf-8"))
 
-    base = acc["display_currency"]
+    cfg = {}
+    if os.path.exists("projects.json"):
+        cfg = json.load(open("projects.json", encoding="utf-8")).get("projects", {}).get(args.project, {})
+    base = cfg.get("display_currency") or acc.get("display_currency") or "USD"
+    card = {} if args.no_card else (cfg.get("card") or acc.get("card") or {})
+    fee, lag = card.get("fee", 0) or 0, int(card.get("lag_days", 0) or 0)
     start = acc["accounting_start"]
     vendors = args.vendors if args.vendors is not None else acc.get("vendors", "*")
     vendor_set = None if vendors == "*" else {v.lower() for v in vendors}
@@ -71,12 +78,13 @@ def main():
     paid_by = acc["paid_by"]
     shares = {p["name"]: p["share"] for p in acc["partners"]}
 
-    def norm(x):  # live files say `by` and may carry the rate of the payment day
+    def norm(x):  # live files say `by`; a recorded rate becomes a currency pair (from, to, value)
         y = dict(x)
         y["paid_by"] = x.get("paid_by") or x.get("by")
-        if y.get("rate") is None and isinstance(x.get("ils_per_usd"), (int, float)) \
-                and x.get("currency") == "ILS" and base == "USD":
-            y["rate"] = x["ils_per_usd"]
+        if isinstance(x.get("ils_per_usd"), (int, float)):
+            y["fx"] = ("USD", "ILS", x["ils_per_usd"])
+        elif isinstance(x.get("rate"), (int, float)):
+            y["fx"] = (x.get("rate_base", "USD"), x["currency"], x["rate"])
         return y
     settlements = [norm(s) for s in acc.get("settlements", [])]
     adjustments = [norm(a) for a in acc.get("adjustments", [])]
@@ -99,25 +107,39 @@ def main():
     def value(amount, cur, date):
         return amount / rate_on(rates, cur or base, date)
 
-    def value_of(x):  # settlement / adjustment: its own recorded rate wins, else the rate of its date
-        if x.get("rate") and x["currency"] != base:
-            return x["amount"] / x["rate"]
-        return value(x["amount"], x["currency"], x["date"])
+    def receipt_value(r):  # paid by card: converted the next day, plus the card's fee
+        cur = r.get("currency") or base
+        if cur == base:
+            return r["amount"]
+        day = (dt.date.fromisoformat(r["date"]) + dt.timedelta(days=lag)).isoformat()
+        return value(r["amount"], cur, day) * (1 + fee)
+
+    def value_of(x):  # settlement / adjustment: its recorded pair wins, else the plain rate of its date
+        cur = x.get("currency") or base
+        if cur == base:
+            return x["amount"]
+        fx = x.get("fx")
+        if fx and fx[0] == base and fx[1] == cur:
+            return x["amount"] / fx[2]
+        if fx and fx[0] == cur and fx[1] == base:
+            return x["amount"] * fx[2]
+        return value(x["amount"], cur, x["date"])
 
     def counted(r):
         return (r["date"] >= start and (vendor_set is None or r["merchant"].lower() in vendor_set)
                 and r["id"] not in excluded and r.get("amount") is not None)
 
     cnt = sorted((r for r in rows if counted(r)), key=lambda r: r["date"])
-    total = sum(value(r["amount"], r.get("currency"), r["date"]) for r in cnt)
+    total = sum(receipt_value(r) for r in cnt)
 
     others = [p for p in shares if p != paid_by]
     last_pay = max((s["date"] for s in settlements if s["paid_by"] != paid_by), default=None)
     since_rows = [r for r in cnt if last_pay is None or r["date"] > last_pay]
-    since_last = sum(value(r["amount"], r.get("currency"), r["date"]) for r in since_rows)
+    since_last = sum(receipt_value(r) for r in since_rows)
 
     sym = {"USD": "$", "ILS": "₪", "EUR": "€"}.get(base, base + " ")
-    print("project %s · start %s · vendors %s · %s" % (args.project, start, vendors, rate_src))
+    print("project %s · start %s · vendors %s · display %s · card fee %.1f%% lag %dd · %s" % (
+        args.project, start, vendors, base, fee * 100, lag, rate_src))
     print("counted rows: %d   total: %s%.2f" % (len(cnt), sym, total))
     print("since last payment (%s): %d rows, %s%.2f" % (last_pay or "start", len(since_rows), sym, since_last))
     for p in others:
@@ -126,7 +148,7 @@ def main():
         share = total * shares[p]
         bal = share - paid + adj
         carried = bal - since_last * shares[p]
-        fixed = sum(1 for s in settlements if s["paid_by"] == p and s.get("rate"))
+        fixed = sum(1 for s in settlements if s["paid_by"] == p and s.get("fx") and s["currency"] != base)
         print("%s: share %s%.2f − paid %s%.2f %s adj %s%.2f = balance %s%.2f  (carried over %s%.2f; %d payment(s) at recorded rates)" % (
             p, sym, share, sym, paid, "+" if adj >= 0 else "−", sym, abs(adj), sym, bal, sym, carried, fixed))
     skipped = [r for r in rows if not counted(r)]
@@ -137,7 +159,7 @@ def main():
     if args.rows:
         for r in cnt:
             print("  %s %-12s %9.2f %-3s %s%.2f  %s" % (r["date"], r["merchant"][:12], r["amount"],
-                  r.get("currency") or base, sym, value(r["amount"], r.get("currency"), r["date"]), r["_src"]))
+                  r.get("currency") or base, sym, receipt_value(r), r["_src"]))
 
 
 if __name__ == "__main__":

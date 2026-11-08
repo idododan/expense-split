@@ -32,7 +32,9 @@ Deployed once to GitHub Pages from `idododan/expense-split` (`main`). No build s
       "branch": "main",
       "expenses_path": "data/expenses.json",
       "accounting_path": "data/accounting.json",
-      "local": "local/mgs"
+      "local": "local/mgs",
+      "display_currency": "ILS",
+      "card": { "fee": 0.03, "lag_days": 1 }
     }
   }
 }
@@ -89,12 +91,12 @@ accepts `description` and `paid_by`.
 | Field | Meaning |
 |---|---|
 | `accounting_start` | first date that counts (inclusive). Earlier rows are shown, not split. |
-| `display_currency` | currency of every total on the page. Rows and payments in other currencies are converted at today's rate (§5). |
+| `display_currency` | currency of every total on the page; `projects.json` overrides it (ILS for both projects). Other currencies convert per §5. |
 | `paid_by` | the partner who pays the bills. Every other partner owes their share. |
 | `partners` | ordered; shares sum to 1. First listed is shown first. |
 | `vendors` | `"*"` = every feed row counts; otherwise a list of merchant names (case-insensitive) that count. |
 | `history` | receipts from before the feed existed. `reference` is the vendor's document number and is how a history row is matched to a feed row. |
-| `settlements` | partner payments. `amount` is positive, in `currency`. `rate` (units of `currency` per 1 display unit on the payment date) fixes the payment's value; `ils_per_usd` is the same thing as the collector wrote it, read when `currency` is ILS and the display currency USD. Without either, today's rate applies. Appended by the payments script; edited or removed only by hand. |
+| `settlements` | partner payments. `amount` is positive, in `currency`. A recorded rate is kept as a currency pair so it survives a change of display currency: `ils_per_usd` (1 USD = v ILS, as the collector wrote it) or `rate` + `rate_base` (1 `rate_base` = `rate` units of `currency`; `rate_base` defaults to USD). The pair is used when it connects `currency` with the display currency; otherwise the rate of the payment date. Appended by the payments script; edited or removed only by hand. |
 | `adjustments` | signed amounts added to a partner's balance (positive = owes more); `rate` as above. |
 | `excluded` | feed row `id`s that must not count (shown, struck through). |
 
@@ -110,7 +112,7 @@ counted(row)  = date ≥ accounting_start
               ∧ (vendors = "*" ∨ merchant ∈ vendors)
               ∧ id ∉ excluded
               ∧ amount ≠ null
-value(row)    = amount converted to display_currency at the rate of the row's date (§5)
+value(row)    = amount converted to display_currency the way the owner's card did it (§5)
                 (for a shared row with `receipt_total` set, `amount` is already this
                  project's part — never divide again; with `receipt_total` null the full
                  amount counts, see §9)
@@ -132,8 +134,19 @@ the page; history rows and settlements never do.
 ## 5. Currency
 
 Principle (owner, 2026-11-08): a partner's payment must cover their share of what the
-owner actually paid, so every amount is valued on the day it happened and the balance
-never drifts with the exchange rate.
+owner actually paid. The owner pays in shekels through a credit card, so the ledger is
+in ILS and a dollar receipt is worth what the card charged for it. From eight statement
+lines (2026-11-08) the card's formula is exact:
+
+```
+charge (ILS) = amount (USD) × representative rate on the day AFTER the transaction × 1.03
+```
+
+The page uses the ECB rate of that day (Frankfurter) in place of the Bank of Israel
+representative rate; on the five dated examples they differ by at most 0.3%, i.e. a few
+agorot per receipt. `card.fee` and `card.lag_days` live in `projects.json`. Payments carry
+no fee: a shekel payment counts as is; a dollar payment converts at the plain rate of its
+date (or its recorded pair, §3).
 
 At load the page fetches the daily ECB series for the currencies present, base =
 `display_currency`, from the earliest date in the data
@@ -194,16 +207,18 @@ Pages too.
 ## 8. Page
 
 Same look as the old page (Heebo, pink→blue header, white cards, 24 px radius).
-Summary card, mockup A from the brief:
+Summary card. The brief's mockup A put "to split since last payment" on top; after the
+first real payment the owner found that misleading (a ₪1 payment made the headline
+$0.00), so the headline is the balance and the since-last figure is the line under it
+(owner, 2026-11-08):
 
 ```
 MGS-Finance / TRS · Ido & Guy 50/50
-TO SPLIT SINCE LAST PAYMENT (Aug 13)
-$347.31
-──────────
-Guy owes Ido   $173.66
-  incl. $x carried over from before          (only when carried ≠ 0)
-✅ Guy paid ₪465 (~$…) on Aug 13 · 1 USD = ₪… (date)
+GUY OWES IDO
+₪627.82
+✅ Guy paid ₪465 on Aug 13, 2026 · his half of spending through mid-Aug
+New since Aug 13: ₪1,192.60 in 10 receipts, Guy's share ₪596.30 · ₪31.52 still owed from before
+latest 1 USD = ₪3.20 (2026-11-06) · ECB rate of the day after each receipt + 3% card fee
 [ + Add payment ]
 Receipts since Aug 13 (7)       newest first: date · merchant · description · amount
                                 (converted) · "half: …"
@@ -222,9 +237,12 @@ scrubbed of "Your receipt from …", the merchant name and the reference; else t
    2026-11-08, $17.38 of it pure FX drift). Per-day rates give $173.74, nine cents from
    the old page's $173.66. The collector's recorded `ils_per_usd` on the two shekel
    payments agrees with the ECB series to the fourth decimal.
-1. **Display currency USD** for MGS (owner, same reasoning: the receipts and the card
-   charges are in USD). The old page showed its totals in ₪; the new page shows $ with
-   ₪ per receipt.
+1. **Display currency ILS, card formula** (owner, later the same day: "my rate is the
+   conversion of the credit card company", with eight statement lines). Everything is
+   in shekels, dollar receipts at the card's charge (§5). Consequence: the 3% fee now
+   applies to every receipt since 2026-06-07, which Guy's three payments did not cover;
+   that shows as ₪31.52 "still owed from before". If the owner prefers to start the fee
+   from a date, set `card.from` — not built yet, say so.
 2. **Shared Anthropic receipts count in full in both projects** (owner: "Guy pays half
    in MGS and Omri pays half of the same receipt in YourRights"). Since Sep 2026 these
    rows are in both feeds with `receipt_total: null`; nothing changes in the collector.

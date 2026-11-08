@@ -85,7 +85,7 @@ function handle_(req) {
     var acc = readFile_(token, cfg.repo, cfg.accounting_path, cfg.branch);
     if (!acc.json) return { ok: false, error: cfg.accounting_path + ' not found in ' + cfg.repo };
 
-    var payment = validatePayment_(req, acc.json);
+    var payment = validatePayment_(req, acc.json, cfg);
     if (payment.error) return { ok: false, error: payment.error };
 
     var updated = appendSettlement_(acc.json, payment);
@@ -107,7 +107,7 @@ function handle_(req) {
   }
 }
 
-function validatePayment_(req, acc) {
+function validatePayment_(req, acc, cfg) {
   var date = String(req.date || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00Z').getTime())) return { error: 'date must be YYYY-MM-DD' };
   var tomorrow = new Date(Date.now() + 36 * 3600 * 1000).toISOString().slice(0, 10);
@@ -129,10 +129,10 @@ function validatePayment_(req, acc) {
   var note = String(req.note || '').trim().slice(0, MAX_NOTE);
 
   var payment = { date: date, by: by, amount: amount, currency: currency, note: note };
-  var base = acc.display_currency || 'USD';
+  var base = (cfg && cfg.display_currency) || acc.display_currency || 'USD';   // projects.json wins, as in the page
   if (currency !== base) {
     var rate = rateOn_(date, base, currency);
-    if (rate) payment.rate = rate;             // units of `currency` per 1 display unit that day
+    if (rate) { payment.rate = rate; payment.rate_base = base; }   // 1 base = `rate` units of `currency` that day
   }
   payment.added_at = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
   payment.added_by = 'web';

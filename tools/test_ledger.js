@@ -9,9 +9,10 @@ var root = path.join(__dirname, '..');
 var app = require(path.join(root, 'app.js'));
 
 var failures = 0, checks = 0;
+var TOL = 0.005;
 function eq(name, got, want) {
   checks++;
-  var ok = typeof want === 'number' ? Math.abs(got - want) < 0.005 : got === want;
+  var ok = typeof want === 'number' ? Math.abs(got - want) < TOL : got === want;
   if (!ok) { failures++; console.log('  FAIL ' + name + ': got ' + JSON.stringify(got) + ', want ' + JSON.stringify(want)); }
 }
 function load(p) { return JSON.parse(fs.readFileSync(path.join(root, p), 'utf8')); }
@@ -123,6 +124,54 @@ eq('render', app.scrubDescription({ subject: 'Your receipt from Render Services,
 eq('money', app.fmtMoney(1020.51, 'USD'), '$1,020.51');
 eq('money whole', app.fmtMoney(465, 'ILS', { whole: true }), '₪465');
 eq('money negative', app.fmtMoney(-3.5, 'USD'), '−$3.50');
+
+
+// ── 5. the card's formula: shekel display, ECB rate of the next day, +3% (the owner's eight statement lines) ──
+console.log('card formula');
+var cardCfg = { display_currency: 'ILS', card: { fee: 0.03, lag_days: 1 } };
+// ILS display → rates are "units of USD per 1 ILS" = 1 / (ILS per USD). The card's representative rates:
+var ilsPerUsd = { '2026-10-23': 3.112, '2026-10-28': 3.128, '2026-11-03': 3.157, '2026-11-04': 3.157, '2026-11-06': 3.194 };
+var usdPerIls = {}; Object.keys(ilsPerUsd).forEach(function (d) { usdPerIls[d] = 1 / ilsPerUsd[d]; });
+var cardRates = { USD: { latest: usdPerIls['2026-11-06'], byDate: usdPerIls } };
+var cardFeed = { expenses: [
+  { id: 'a', date: '2026-11-07', merchant: 'Anthropic', reference: 'r1', amount: 100, currency: 'USD', status: 'ok' },   // Sat → Sun 08/11 → Fri 06/11 quote
+  { id: 'b', date: '2026-11-03', merchant: 'Supabase', reference: 'r2', amount: 25, currency: 'USD', status: 'ok' },
+  { id: 'c', date: '2026-11-02', merchant: 'Render', reference: 'r3', amount: 28, currency: 'USD', status: 'ok' },
+  { id: 'd', date: '2026-11-02', merchant: 'Render', reference: 'r4', amount: 5.68, currency: 'USD', status: 'ok' },
+  { id: 'e', date: '2026-10-27', merchant: 'Amazon', reference: 'r5', amount: 14.99, currency: 'USD', status: 'ok' },
+  { id: 'f', date: '2026-10-24', merchant: 'Green API', reference: 'r6', amount: 12, currency: 'USD', status: 'ok' },    // Sat → Sun 25/10 → Fri 23/10 quote
+  { id: 'g', date: '2026-10-24', merchant: 'Anthropic', reference: 'r7', amount: 10.19, currency: 'USD', status: 'ok' },
+  { id: 'h', date: '2026-10-24', merchant: 'Anthropic', reference: 'r8', amount: 16.99, currency: 'USD', status: 'ok' },
+  { id: 'i', date: '2026-10-30', merchant: '019 SMS', reference: null, amount: 29.5, currency: 'ILS', status: 'ok' }      // already shekels: no conversion, no fee
+] };
+var cardAcc = { accounting_start: '2026-10-01', display_currency: 'USD', paid_by: 'Ido',
+  partners: [{ name: 'Ido', share: 0.5 }, { name: 'Guy', share: 0.5 }], vendors: '*',
+  settlements: [
+    { date: '2026-10-20', by: 'Guy', amount: 100, currency: 'ILS', ils_per_usd: 3.1 },     // shekels into a shekel ledger: ₪100, the recorded pair is irrelevant
+    { date: '2026-10-28', by: 'Guy', amount: 10, currency: 'USD' }                          // dollars: plain rate of its day, no fee → 10 × 3.128
+  ] };
+L = app.computeLedger(cardFeed, cardAcc, cardRates, cardCfg);
+eq('display currency from projects.json', L.base, 'ILS');
+function val(id) { return L.rows.filter(function (r) { return r.id === id; })[0].value; }
+TOL = 0.0101;   // the card rounds its own way; one of the eight lines is one agora off the arithmetic
+eq('$100.00 → ₪328.98', val('a'), 328.98);
+eq('$25.00 → ₪81.29', val('b'), 81.29);
+eq('$28.00 → ₪91.05', val('c'), 91.05);
+eq('$5.68 → ₪18.47', val('d'), 18.47);
+eq('$14.99 → ₪48.29', val('e'), 48.29);
+eq('$12.00 → ₪38.46', val('f'), 38.46);
+eq('$10.19 → ₪32.66', val('g'), 32.66);
+eq('$16.99 → ₪54.46', val('h'), 54.46);
+TOL = 0.005;
+eq('shekel receipt untouched', val('i'), 29.5);
+eq('shekel payment untouched', L.partners[0].paid, 100 + 10 * 3.128);
+eq('rateUsed for a USD payment, ILS display', L.rateUsed(L.settlements[1]), 1 / 3.128);
+eq('shiftDate', app.shiftDate('2026-10-31', 1), '2026-11-01');
+eq('no card config → no fee', app.computeLedger(cardFeed, cardAcc, cardRates, { display_currency: 'ILS' }).rows.filter(function (r) { return r.id === 'a'; })[0].value, 319.4);
+// a payment recorded by the script under a USD ledger (rate = ILS per USD, rate_base USD) still converts right in a ILS ledger and vice versa
+var mixed = Object.assign({}, cardAcc, { settlements: [{ date: '2026-10-28', by: 'Guy', amount: 31.28, currency: 'ILS', rate: 3.128, rate_base: 'USD' }] });
+eq('rate+rate_base pair, ILS display: no conversion', app.computeLedger(cardFeed, mixed, cardRates, cardCfg).partners[0].paid, 31.28);
+eq('rate+rate_base pair, USD display: 31.28 / 3.128', app.computeLedger(cardFeed, mixed, { ILS: 3.5 }, { display_currency: 'USD' }).partners[0].paid, 10);
 
 console.log(checks + ' checks, ' + failures + ' failed');
 process.exit(failures ? 1 : 0);

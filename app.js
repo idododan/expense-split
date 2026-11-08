@@ -9,7 +9,7 @@
   // api.frankfurter.app now 301-redirects here without CORS headers, so browsers must call this host directly.
   var FRANKFURTER = 'https://api.frankfurter.dev/v1/';
   // Last-known rates, used only when both rate services fail (shown as "offline rate").
-  var FALLBACK_RATES = { USD: { ILS: 3.0129, EUR: 0.86, GBP: 0.75 } };
+  var FALLBACK_RATES = { USD: { ILS: 3.19, EUR: 0.86, GBP: 0.75 } };
   var FEED_BOILERPLATE = [
     /^your receipt from\s+/i, /^new invoice from\s+/i, /^your invoice from\s+/i,
     /^receipt from\s+/i, /^receipt\s+/i, /^invoice\s+/i, /^electronic receipt$/i,
@@ -24,7 +24,6 @@
     });
   }
   function escRe(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-  function round2(n) { return Math.round(n * 100) / 100; }
 
   function fmtMoney(n, cur, opts) {
     opts = opts || {};
@@ -34,6 +33,7 @@
     var s = abs.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
     return (n < 0 ? '−' : '') + sym + s;
   }
+  function fmtRate(n) { return (Math.round(n * 1000) / 1000).toString(); }
   function fmtDate(iso, withYear) {
     if (!iso) return '';
     var d = new Date(iso + 'T00:00:00');
@@ -48,6 +48,12 @@
   function todayIso() {
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function shiftDate(iso, days) {
+    if (!days) return iso;
+    var d = new Date(iso + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
   }
 
   /** The feed subject minus the vendor boilerplate, the merchant name and the reference. */
@@ -69,36 +75,47 @@
 
   // ───────────────────────────── the balance rule (SPEC §4) ─────────────────────────────
 
-  /** Accept the field spellings in the live files (desc / by / ils_per_usd) and the spec's. */
-  function normalizeAccounting(acc) {
-    var base = acc.display_currency || 'USD';
+  /**
+   * Accept the field spellings in the live files (desc / by / ils_per_usd) and the spec's,
+   * and let projects.json (cfg) override display_currency and the card conversion.
+   */
+  function normalizeAccounting(acc, cfg) {
+    cfg = cfg || {};
     var out = Object.assign({}, acc);
+    out.display_currency = cfg.display_currency || acc.display_currency || 'USD';
+    out.card = cfg.card || acc.card || null;                        // { fee: 0.03, lag_days: 1 } or null
     out.history = (acc.history || []).map(function (h) {
       return Object.assign({}, h, { description: h.description || h.desc || '' });
     });
-    function withRate(x) {
+    function withFx(x) {
       var y = Object.assign({}, x, { paid_by: x.paid_by || x.by });
-      if (y.rate == null && typeof x.ils_per_usd === 'number' && x.currency === 'ILS' && base === 'USD') y.rate = x.ils_per_usd;
+      // A recorded rate, as a currency pair so it survives a change of display currency:
+      // ils_per_usd → 1 USD = v ILS; rate (+ rate_base) → 1 rate_base = v x.currency.
+      if (typeof x.ils_per_usd === 'number') y.fx = { from: 'USD', to: 'ILS', value: x.ils_per_usd };
+      else if (typeof x.rate === 'number') y.fx = { from: x.rate_base || 'USD', to: x.currency, value: x.rate };
       return y;
     }
-    out.settlements = (acc.settlements || []).map(withRate);
-    out.adjustments = (acc.adjustments || []).map(withRate);
+    out.settlements = (acc.settlements || []).map(withFx);
+    out.adjustments = (acc.adjustments || []).map(withFx);
     return out;
   }
 
   /**
-   * computeLedger(feed, accounting, rates) → ledger
+   * computeLedger(feed, accounting, rates, cfg) → ledger
    *   feed       the project's expenses.json ({expenses:[…]}) or null
    *   accounting the project's accounting.json
    *   rates      {CUR: r} where r is a number (units of CUR per 1 display-currency unit)
    *              or { latest: number, byDate: {'YYYY-MM-DD': number} } — then each row,
    *              payment and adjustment converts at the rate of its own date (SPEC §5)
+   *   cfg        the project's entry in projects.json (display_currency / card overrides)
    * Pure: no DOM, no network, no Date.now().
    */
-  function computeLedger(feed, rawAcc, rates) {
-    var acc = normalizeAccounting(rawAcc);
-    var base = acc.display_currency || 'USD';
+  function computeLedger(feed, rawAcc, rates, cfg) {
+    var acc = normalizeAccounting(rawAcc, cfg);
+    var base = acc.display_currency;
     var start = acc.accounting_start;
+    var fee = acc.card && acc.card.fee || 0;
+    var lag = acc.card && acc.card.lag_days || 0;
     var vendors = acc.vendors == null ? '*' : acc.vendors;
     var vendorSet = null;
     if (vendors !== '*') {
@@ -111,6 +128,7 @@
     (acc.partners || []).forEach(function (p) { shares[p.name] = p.share; });
     var paidBy = acc.paid_by;
 
+    /** units of `cur` per 1 display unit on `date` */
     function rateFor(cur, date) {
       cur = cur || base;
       if (cur === base) return 1;
@@ -127,9 +145,31 @@
       throw new Error('no rate for ' + cur);
     }
     function value(amount, cur, date) { return amount / rateFor(cur, date); }
-    /** A settlement or adjustment: its own recorded rate wins; else the rate of its date. */
-    function valueOf(x) { return x.rate && x.currency !== base ? x.amount / x.rate : value(x.amount, x.currency, x.date); }
-    function rateUsed(x) { return x.currency === base ? 1 : (x.rate || rateFor(x.currency, x.date)); }
+    /** A receipt the owner paid by card: converted on the next day, plus the card's fee (SPEC §5). */
+    function receiptValue(row) {
+      if (!row.currency || row.currency === base) return row.amount;
+      return row.amount / rateFor(row.currency, shiftDate(row.date, lag)) * (1 + fee);
+    }
+    /** price of 1 unit of x.currency in display units from the pair recorded on x, or null */
+    function recordedPx(x) {
+      var f = x.fx;
+      if (!f || !x.currency || x.currency === base) return null;
+      if (f.from === base && f.to === x.currency) return 1 / f.value;
+      if (f.from === x.currency && f.to === base) return f.value;
+      return null;
+    }
+    /** A settlement or adjustment: its recorded pair wins; else the plain rate of its date, no fee. */
+    function valueOf(x) {
+      if (!x.currency || x.currency === base) return x.amount;
+      var px = recordedPx(x);
+      return px ? x.amount * px : value(x.amount, x.currency, x.date);
+    }
+    /** units of x.currency per 1 display unit that applied to x */
+    function rateUsed(x) {
+      if (!x.currency || x.currency === base) return 1;
+      var px = recordedPx(x);
+      return px ? 1 / px : rateFor(x.currency, x.date);
+    }
 
     // rows = feed ∪ history, deduplicated by reference (feed wins; history description shown)
     var rows = [];
@@ -169,7 +209,8 @@
       else if (row.amount == null) reason = 'no_amount';
       row.counted = reason === null;
       row.reason = reason;
-      row.value = row.amount == null ? null : value(row.amount, row.currency, row.date);
+      row.value = row.amount == null ? null : receiptValue(row);
+      row.fxRate = row.amount == null || !row.currency || row.currency === base ? null : rateFor(row.currency, shiftDate(row.date, lag));
     });
     rows.sort(function (a, b) {
       if (a.date !== b.date) return a.date < b.date ? 1 : -1;      // newest first
@@ -179,7 +220,7 @@
     var counted = rows.filter(function (r) { return r.counted; });
     var total = counted.reduce(function (s, r) { return s + r.value; }, 0);
 
-    var settlements = (acc.settlements || []).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var settlements = acc.settlements.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
     var lastPayment = null;
     settlements.forEach(function (s) {
       if (s.paid_by !== paidBy && (!lastPayment || s.date > lastPayment)) lastPayment = s.date;
@@ -192,7 +233,7 @@
       settlements.forEach(function (s) {
         if (s.paid_by === p.name) { paid += valueOf(s); last = s; }
       });
-      (acc.adjustments || []).forEach(function (a) {
+      acc.adjustments.forEach(function (a) {
         if (a.partner === p.name) adjusted += valueOf(a);
       });
       var shareAmount = total * p.share;
@@ -207,9 +248,9 @@
     var earlier = rows.filter(function (r) { return lastPayment && r.date <= lastPayment; });
 
     return {
-      base: base, start: start, paidBy: paidBy, vendors: vendors, rows: rows, counted: counted,
-      total: total, sinceRows: sinceRows, sinceLast: sinceLast, lastPayment: lastPayment,
-      partners: partners, settlements: settlements, recent: recent, earlier: earlier,
+      base: base, start: start, paidBy: paidBy, vendors: vendors, card: acc.card, fee: fee, lag: lag,
+      rows: rows, counted: counted, total: total, sinceRows: sinceRows, sinceLast: sinceLast,
+      lastPayment: lastPayment, partners: partners, settlements: settlements, recent: recent, earlier: earlier,
       pending: rows.filter(function (r) { return r.reason === 'no_amount'; }).length,
       value: value, valueOf: valueOf, rateFor: rateFor, rateUsed: rateUsed
     };
@@ -217,8 +258,7 @@
 
   // ───────────────────────────── rates ─────────────────────────────
 
-  function neededCurrencies(feed, acc) {
-    var base = acc.display_currency || 'USD';
+  function neededCurrencies(feed, acc, base) {
     var set = {};
     (feed && feed.expenses || []).forEach(function (r) { if (r.currency) set[r.currency] = true; });
     (acc.history || []).forEach(function (h) { if (h.currency) set[h.currency] = true; });
@@ -336,7 +376,7 @@
 
   // ───────────────────────────── rendering ─────────────────────────────
 
-  var state = { config: null, projectId: null, cfg: null, source: 'github', feed: null, acc: null,
+  var state = { config: null, projectId: null, cfg: null, source: 'github', feed: null, acc: null, base: 'USD',
                 fx: { rates: {}, live: false, source: 'offline', date: null }, ledger: null, payFormOpen: false };
 
   function $(id) { return document.getElementById(id); }
@@ -385,7 +425,7 @@
     }
 
     var ledger;
-    try { ledger = computeLedger(feed, acc, state.fx.rates); }
+    try { ledger = computeLedger(feed, acc, state.fx.rates, cfg); }
     catch (e) { content.innerHTML = '<div class="summary notice">' + esc(e.message) + '</div>'; return; }
     state.ledger = ledger;
     var base = ledger.base;
@@ -396,34 +436,34 @@
     $('subtitle').textContent = names + ' ' + split + ' · since ' + fmtDate(ledger.start, true) +
       (ledger.vendors !== '*' ? ' · ' + ledger.vendors.join(', ') + ' only' : '');
 
-    // ── summary card (mockup A) ──
+    // ── summary card: the balance is the headline; what is new since the last payment under it ──
     var h = '<div class="summary">';
-    h += '<div class="total-row"><div class="total-label">To split since ' +
-      (ledger.lastPayment ? 'last payment (' + esc(fmtDate(ledger.lastPayment)) + ')' : esc(fmtDate(ledger.start, true))) +
-      '</div><div class="total-amount">' + esc(fmtMoney(ledger.sinceLast, base)) + '</div>' +
-      (ledger.pending ? '<div class="pending">+ ' + ledger.pending + ' receipt' + (ledger.pending > 1 ? 's' : '') + ' with the amount still pending</div>' : '') +
-      '</div>';
-    h += '<div class="divider"></div>';
-    others.forEach(function (p) {
+    others.forEach(function (p, i) {
       var owes = p.balance;
       var label, amount;
       if (Math.abs(owes) < 0.005) { label = 'All settled up 🎉'; amount = fmtMoney(0, base); }
       else if (owes > 0) { label = esc(p.name) + ' owes ' + esc(ledger.paidBy); amount = fmtMoney(owes, base); }
       else { label = esc(ledger.paidBy) + ' owes ' + esc(p.name); amount = fmtMoney(-owes, base); }
-      h += '<div class="balance-row"><div class="balance-label">' + label + '</div><div class="balance-amount">' + esc(amount) + '</div>';
-      if (Math.abs(p.carried) >= 0.005) {
-        h += '<div class="carried">incl. ' + esc(fmtMoney(Math.abs(p.carried), base)) + (p.carried > 0 ? ' carried over from before' : ' overpaid before') +
-          (Math.abs(p.adjusted) >= 0.005 ? ' (with ' + esc(fmtMoney(p.adjusted, base)) + ' adjustments)' : '') + '</div>';
-      }
-      h += '</div>';
+      if (i > 0) h += '<div class="divider"></div>';
+      h += '<div class="total-row"><div class="total-label">' + label + '</div><div class="total-amount">' + esc(amount) + '</div></div>';
       if (p.lastSettlement) {
         var s = p.lastSettlement;
         var paidStr = fmtMoney(s.amount, s.currency, { whole: true });
-        if (s.currency !== base) paidStr += ' (~' + fmtMoney(ledger.valueOf(s), base) + ', at ' + fmtMoney(ledger.rateUsed(s), s.currency) + ' then)';
+        if (s.currency !== base) paidStr += ' (~' + fmtMoney(ledger.valueOf(s), base) + ', at ' + fmtRate(ledger.rateUsed(s)) + ' then)';
         h += '<div class="settle-note">✅ ' + esc(p.name) + ' paid ' + esc(paidStr) + ' on ' + esc(fmtDate(s.date, true)) +
           (s.note ? ' · ' + esc(s.note) : '') + '</div>';
       }
+      var since = ledger.lastPayment
+        ? 'New since ' + fmtDate(ledger.lastPayment) + ': ' + fmtMoney(ledger.sinceLast, base) + ' in ' + ledger.sinceRows.length + ' receipt' + (ledger.sinceRows.length === 1 ? '' : 's') +
+          ', ' + esc(p.name) + '’s share ' + fmtMoney(ledger.sinceLast * p.share, base)
+        : 'Since ' + fmtDate(ledger.start, true) + ': ' + fmtMoney(ledger.total, base) + ' in ' + ledger.counted.length + ' receipts, no payment yet';
+      if (Math.abs(p.carried) >= 0.005) {
+        since += ' · ' + fmtMoney(Math.abs(p.carried), base) + (p.carried > 0 ? ' still owed from before' : ' overpaid before');
+      }
+      if (Math.abs(p.adjusted) >= 0.005) since += ' · ' + fmtMoney(p.adjusted, base) + ' adjustments';
+      h += '<div class="since">' + since + '</div>';
     });
+    if (ledger.pending) h += '<div class="pending">+ ' + ledger.pending + ' receipt' + (ledger.pending > 1 ? 's' : '') + ' with the amount still pending</div>';
     var fxLine = rateLine(ledger);
     if (fxLine) h += '<div class="fx">' + esc(fxLine) + '</div>';
     h += '<button class="add-btn" id="add-btn" type="button">+ Add payment</button>';
@@ -459,12 +499,12 @@
     var keys = Object.keys(fx.rates || {}).filter(function (c) { return c !== base; });
     if (!keys.length) return '';
     var parts = keys.map(function (c) {
-      var r = fx.rates[c]; var latest = typeof r === 'number' ? r : r.latest;
-      return '1 ' + base + ' = ' + fmtMoney(latest, c);
+      var r = fx.rates[c]; var latest = typeof r === 'number' ? r : r.latest;   // units of c per 1 base
+      return c === 'USD' || base !== 'USD' ? '1 ' + c + ' = ' + fmtMoney(1 / latest, base) : '1 ' + base + ' = ' + fmtMoney(latest, c);
     });
-    var tail = fx.daily ? ' · each receipt and payment at the ECB rate of its own day'
-             : fx.live ? ' · today\u2019s rate for every date' : ' · offline rate for every date';
-    return (fx.date ? 'latest ' : '') + parts.join(' · ') + (fx.date ? ' (' + fx.date + ')' : '') + tail;
+    var when = fx.daily ? 'ECB rate of the day after each receipt' : fx.live ? 'today’s rate for every date' : 'offline rate for every date';
+    var card = ledger.fee ? ' + ' + fmtPct(ledger.fee) + '% card fee, as on the card statement' : '';
+    return (fx.date ? 'latest ' : '') + parts.join(' · ') + (fx.date ? ' (' + fx.date + ')' : '') + ' · ' + when + card;
   }
 
   // ───────────────────────────── payments (SPEC §6) ─────────────────────────────
@@ -575,10 +615,11 @@
         if (!state.feed && !state.acc) throw new Error('Neither ' + cfg.expenses_path + ' nor ' + cfg.accounting_path + ' was found in ' + (state.source === 'local' ? cfg.local : cfg.repo) + '.');
         if (!state.feed) state.feed = { expenses: [] };
         if (state.acc) {
-          var need = neededCurrencies(state.feed, state.acc);
-          state.fx = { rates: fallbackRates(state.acc.display_currency || 'USD', need), live: false, source: 'offline', date: null };
+          state.base = normalizeAccounting(state.acc, cfg).display_currency;
+          var need = neededCurrencies(state.feed, state.acc, state.base);
+          state.fx = { rates: fallbackRates(state.base, need), live: false, source: 'offline', date: null };
           render();                                             // paint at once with the fallback rate
-          return fetchRates(state.acc.display_currency || 'USD', need, earliestDate(state.feed, state.acc))
+          return fetchRates(state.base, need, earliestDate(state.feed, state.acc))
             .then(function (fx) { state.fx = fx; render(); });
         }
         render();
@@ -606,8 +647,9 @@
       .catch(function (e) { fail(e.message); });
   }
 
-  var api = { computeLedger: computeLedger, normalizeAccounting: normalizeAccounting, scrubDescription: scrubDescription, fmtMoney: fmtMoney,
-              neededCurrencies: neededCurrencies, fallbackRates: fallbackRates, earliestDate: earliestDate };
+  var api = { computeLedger: computeLedger, normalizeAccounting: normalizeAccounting, scrubDescription: scrubDescription,
+              fmtMoney: fmtMoney, neededCurrencies: neededCurrencies, fallbackRates: fallbackRates, earliestDate: earliestDate,
+              shiftDate: shiftDate };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else {
     global.ExpenseSplit = api;
