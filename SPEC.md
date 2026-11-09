@@ -231,6 +231,11 @@ footer: Since Jun 7: $1,020.51 spent · Guy paid $335.74 · 35 receipts · feed 
 Description = the history row's `description` when matched, else the feed `subject`
 scrubbed of "Your receipt from …", the merchant name and the reference; else the merchant.
 
+**A partner's page never reveals another project** (owner, 2026-11-09): no "also in
+another project" or "this project's part of…" on shared rows, no list of project ids in
+the unknown-project message, and the bare address (`/`) shows only "Open the link you were
+given" (the project list appears only with `?source=local`).
+
 ## 9. Choices made here — decided by the owner on 2026-11-08
 
 3. **Access.** Both pages stay on the one public site and the data repos stay public

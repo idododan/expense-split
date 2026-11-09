@@ -399,7 +399,7 @@
     }
     var meta = [fmtDate(r.date, true)];
     if (r.reference) meta.push('#' + r.reference);
-    if (r.shared) meta.push(r.receipt_total != null ? 'this project’s part of ' + fmtMoney(r.receipt_total, r.currency) : 'also in another project');
+    // Never hint that a receipt is shared with, or split with, another project (SPEC §8).
     if (r.source === 'history') meta.push('from the old page');
     var title = esc(r.merchant) + (r.description ? ' <span class="sep">·</span> ' + esc(r.description) : '');
     return '<div class="' + cls + '">' +
@@ -598,7 +598,13 @@
   function renderChooser() {
     $('eyebrow').textContent = 'Shared expenses 💸';
     $('title').textContent = 'Expense split';
-    $('subtitle').textContent = 'pick a project';
+    if (state.source !== 'local') {                              // never list the projects publicly (SPEC §8)
+      $('subtitle').textContent = '';
+      $('content').innerHTML = '<div class="summary notice">Open the link you were given.</div>';
+      $('footer-text').textContent = '';
+      return;
+    }
+    $('subtitle').textContent = 'pick a project (local development)';
     var ids = Object.keys(state.config.projects);
     $('content').innerHTML = '<div class="summary"><div class="chooser">' + ids.map(function (id) {
       var p = state.config.projects[id];
@@ -642,7 +648,7 @@
         state.config = config;
         if (!state.projectId) { renderChooser(); return; }
         state.cfg = config.projects[state.projectId];
-        if (!state.cfg) throw new Error('Unknown project "' + state.projectId + '". Known: ' + Object.keys(config.projects).join(', '));
+        if (!state.cfg) throw new Error('This link does not point to a project. Check the address you were given.');
         document.title = state.cfg.name + ' — expense split';
         return loadAndRender();
       })
